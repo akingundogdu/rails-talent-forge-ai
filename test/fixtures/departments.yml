@@ -1,0 +1,16 @@
+engineering:
+  name: Engineering
+  description: Engineering department
+  manager: jane
+
+frontend:
+  name: Frontend
+  description: Frontend development team
+  parent_department: engineering
+  manager: john
+
+backend:
+  name: Backend
+  description: Backend development team
+  parent_department: engineering
+  manager: bob 

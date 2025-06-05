@@ -1,0 +1,471 @@
+---
+openapi: 3.0.1
+info:
+  title: Organization Chart API
+  version: v1
+  description: API documentation for Organization Chart management
+paths:
+  "/api/v1/departments":
+    get:
+      summary: Lists departments
+      tags:
+      - Departments
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: departments found
+    post:
+      summary: Creates a department
+      tags:
+      - Departments
+      parameters: []
+      responses:
+        '201':
+          description: department created
+        '422':
+          description: invalid request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                parent_department_id:
+                  type: integer
+                  nullable: true
+                manager_id:
+                  type: integer
+                  nullable: true
+              required:
+              - name
+  "/api/v1/departments/{id}":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Retrieves a department
+      tags:
+      - Departments
+      responses:
+        '200':
+          description: department found
+        '404':
+          description: department not found
+    patch:
+      summary: Updates a department
+      tags:
+      - Departments
+      parameters: []
+      responses:
+        '200':
+          description: department updated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                parent_department_id:
+                  type: integer
+                manager_id:
+                  type: integer
+    delete:
+      summary: Deletes a department
+      tags:
+      - Departments
+      responses:
+        '204':
+          description: department deleted
+  "/api/v1/departments/tree":
+    get:
+      summary: Retrieves department tree
+      tags:
+      - Departments
+      responses:
+        '200':
+          description: department tree retrieved
+  "/api/v1/departments/{id}/org_chart":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Retrieves department organization chart
+      tags:
+      - Departments
+      responses:
+        '200':
+          description: organization chart retrieved
+  "/api/v1/employees":
+    get:
+      summary: Lists employees
+      tags:
+      - Employees
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: employees found
+    post:
+      summary: Creates an employee
+      tags:
+      - Employees
+      parameters: []
+      responses:
+        '201':
+          description: employee created
+        '422':
+          description: invalid request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                position_id:
+                  type: integer
+                manager_id:
+                  type: integer
+                  nullable: true
+              required:
+              - first_name
+              - last_name
+              - email
+              - position_id
+  "/api/v1/employees/{id}":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Retrieves an employee
+      tags:
+      - Employees
+      responses:
+        '200':
+          description: employee found
+        '404':
+          description: employee not found
+    patch:
+      summary: Updates an employee
+      tags:
+      - Employees
+      parameters: []
+      responses:
+        '200':
+          description: employee updated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                position_id:
+                  type: integer
+                manager_id:
+                  type: integer
+    delete:
+      summary: Deletes an employee
+      tags:
+      - Employees
+      responses:
+        '204':
+          description: employee deleted
+  "/api/v1/employees/{id}/subordinates":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Retrieves employee subordinates
+      tags:
+      - Employees
+      responses:
+        '200':
+          description: subordinates retrieved
+  "/api/v1/departments/{department_id}/employees":
+    parameters:
+    - name: department_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Lists employees for a department
+      tags:
+      - Employees
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: employees found
+  "/api/v1/positions/{position_id}/employees":
+    parameters:
+    - name: position_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Lists employees for a position
+      tags:
+      - Employees
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: employees found
+  "/api/v1/positions":
+    get:
+      summary: Lists positions
+      tags:
+      - Positions
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: positions found
+    post:
+      summary: Creates a position
+      tags:
+      - Positions
+      parameters: []
+      responses:
+        '201':
+          description: position created
+        '422':
+          description: invalid request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                level:
+                  type: integer
+                department_id:
+                  type: integer
+                parent_position_id:
+                  type: integer
+                  nullable: true
+              required:
+              - title
+              - level
+              - department_id
+  "/api/v1/positions/{id}":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Retrieves a position
+      tags:
+      - Positions
+      responses:
+        '200':
+          description: position found
+        '404':
+          description: position not found
+    patch:
+      summary: Updates a position
+      tags:
+      - Positions
+      parameters: []
+      responses:
+        '200':
+          description: position updated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                level:
+                  type: integer
+                department_id:
+                  type: integer
+                parent_position_id:
+                  type: integer
+    delete:
+      summary: Deletes a position
+      tags:
+      - Positions
+      responses:
+        '204':
+          description: position deleted
+  "/api/v1/positions/{id}/hierarchy":
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Retrieves position hierarchy
+      tags:
+      - Positions
+      responses:
+        '200':
+          description: hierarchy retrieved
+  "/api/v1/departments/{department_id}/positions":
+    parameters:
+    - name: department_id
+      in: path
+      required: true
+      schema:
+        type: integer
+    get:
+      summary: Lists positions for a department
+      tags:
+      - Positions
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: per_page
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: positions found
+servers:
+- url: http://localhost:3500
+  description: Development server
+components:
+  schemas:
+    department:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        parent_department_id:
+          type: integer
+          nullable: true
+        manager_id:
+          type: integer
+          nullable: true
+    position:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        level:
+          type: integer
+        department_id:
+          type: integer
+        parent_position_id:
+          type: integer
+          nullable: true
+    employee:
+      type: object
+      properties:
+        id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+        position_id:
+          type: integer
+        manager_id:
+          type: integer
+          nullable: true

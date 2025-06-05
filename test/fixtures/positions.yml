@@ -1,0 +1,19 @@
+lead_engineer:
+  title: Lead Engineer
+  description: Engineering team lead
+  level: 5
+  department: engineering
+
+senior_engineer:
+  title: Senior Engineer
+  description: Senior software engineer
+  level: 4
+  department: engineering
+  parent_position: lead_engineer
+
+junior_engineer:
+  title: Junior Engineer
+  description: Junior software engineer
+  level: 2
+  department: engineering
+  parent_position: senior_engineer 
