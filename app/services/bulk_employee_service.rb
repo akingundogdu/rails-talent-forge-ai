@@ -8,7 +8,15 @@ class BulkEmployeeService
       validate_presence!(params, REQUIRED_FIELDS)
       validate_uniqueness!(params, :email)
 
-      BulkOperationService.bulk_create(Employee, params)
+      # Manual creation with our validation
+      created_employees = []
+      ActiveRecord::Base.transaction do
+        params.each do |employee_params|
+          employee = Employee.create!(employee_params)
+          created_employees << employee
+        end
+      end
+      { success: created_employees, errors: [] }
     end
 
     def bulk_update(params)
@@ -49,7 +57,10 @@ class BulkEmployeeService
 
     def validate_presence!(params, fields)
       missing_fields = params.each_with_object([]) do |param, acc|
-        missing = fields.select { |field| param[field.to_sym].blank? }
+        missing = fields.select do |field|
+          value = param[field.to_s] || param[field.to_sym]
+          value.blank?
+        end
         acc.concat(missing) if missing.any?
       end
 
@@ -57,7 +68,7 @@ class BulkEmployeeService
     end
 
     def validate_uniqueness!(params, field)
-      values = params.map { |p| p[field.to_sym] }
+      values = params.map { |p| p[field.to_s] || p[field.to_sym] }.compact
       duplicates = values.select { |v| values.count(v) > 1 }.uniq
       raise BulkOperationService::BulkOperationError.new("Duplicate values found for #{field}: #{duplicates.join(', ')}") if duplicates.any?
 

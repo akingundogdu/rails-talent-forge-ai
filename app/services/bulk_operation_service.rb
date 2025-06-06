@@ -29,6 +29,46 @@ class BulkOperationService
     def bulk_delete(model_class, ids, options = {})
       new(model_class, options).bulk_delete(ids)
     end
+
+    # Class methods for child services to use
+    def validate_limit!(params, limit = BATCH_LIMIT)
+      raise BulkOperationError.new("Batch size exceeds limit of #{limit}") if params.size > limit
+    end
+
+    def validate_presence!(params, fields)
+      missing_fields = params.each_with_object([]) do |param, acc|
+        missing = fields.select do |field|
+          value = param[field.to_s] || param[field.to_sym]
+          value.blank?
+        end
+        acc.concat(missing) if missing.any?
+      end
+
+      raise BulkOperationError.new("Missing required fields: #{missing_fields.uniq.join(', ')}") if missing_fields.any?
+    end
+
+    def validate_uniqueness!(params, field)
+      values = params.map { |p| p[field.to_s] || p[field.to_sym] }.compact
+      duplicates = values.select { |v| values.count(v) > 1 }.uniq
+      raise BulkOperationError.new("Duplicate values found for #{field}: #{duplicates.join(', ')}") if duplicates.any?
+    end
+
+    def validate_existence!(params, field, model_class)
+      if params.is_a?(Array) && params.first.is_a?(Hash)
+        # For bulk operations with hash params
+        ids = params.map { |p| p[field.to_s] || p[field.to_sym] }.compact
+      else
+        # For simple ID arrays
+        ids = params
+        model_class = field if field.is_a?(Class)
+      end
+
+      return if ids.empty?
+
+      existing_ids = model_class.where(id: ids).pluck(:id)
+      missing_ids = ids - existing_ids
+      raise BulkOperationError.new("#{model_class.name} not found", { missing_ids: missing_ids }) if missing_ids.any?
+    end
   end
 
   def bulk_create(params)
@@ -54,14 +94,17 @@ class BulkOperationService
   end
 
   def bulk_update(params)
-    validate_existence!(params.map { |p| p[:id] }, @model_class)
+    ids = params.map { |p| p['id'] || p[:id] }.compact
+    validate_existence!(ids, @model_class)
 
     process_in_transaction do
       results = { success: [], errors: [] }
 
       params.each do |param|
-        record = @model_class.find(param[:id])
-        if record.update(param.except(:id))
+        id = param['id'] || param[:id]
+        record = @model_class.find(id)
+        update_params = param.is_a?(Hash) ? param.except('id', :id) : param
+        if record.update(update_params)
           results[:success] << record
         else
           results[:errors] << { record: param, errors: record.errors.full_messages }

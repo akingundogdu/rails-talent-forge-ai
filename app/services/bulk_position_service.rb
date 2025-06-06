@@ -10,7 +10,15 @@ class BulkPositionService < BulkOperationService
       validate_existence!(positions, 'department_id', Department)
       validate_existence!(positions, 'parent_position_id', Position) if positions.any? { |p| p['parent_position_id'].present? }
 
-      super(Position, positions)
+      # Manual creation with our validation
+      created_positions = []
+      ActiveRecord::Base.transaction do
+        positions.each do |position_params|
+          position = Position.create!(position_params)
+          created_positions << position
+        end
+      end
+      created_positions
     end
 
     def bulk_update(positions)
@@ -19,7 +27,18 @@ class BulkPositionService < BulkOperationService
       validate_existence!(positions, 'department_id', Department) if positions.any? { |p| p['department_id'].present? }
       validate_existence!(positions, 'parent_position_id', Position) if positions.any? { |p| p['parent_position_id'].present? }
 
-      super(Position, positions)
+      # Manual update with our validation
+      updated_positions = []
+      ActiveRecord::Base.transaction do
+        positions.each do |position_params|
+          id = position_params['id'] || position_params[:id]
+          position = Position.find(id)
+          update_params = position_params.except('id', :id)
+          position.update!(update_params)
+          updated_positions << position
+        end
+      end
+      updated_positions
     end
 
     def bulk_delete(position_ids)
@@ -28,19 +47,20 @@ class BulkPositionService < BulkOperationService
       
       missing_ids = position_ids - positions.pluck(:id)
       unless missing_ids.empty?
-        raise BulkOperationError.new("Some positions not found", { missing_ids: missing_ids })
+        raise BulkOperationService::BulkOperationError.new("Some positions not found", { missing_ids: missing_ids })
       end
 
       process_in_transaction(positions) do
         positions.each do |position|
           if position.employees.exists?
-            raise BulkOperationError.new(
+            raise BulkOperationService::BulkOperationError.new(
               "Cannot delete position with employees",
               { position_id: position.id }
             )
           end
           position.destroy!
         end
+        positions.to_a
       end
     end
 
@@ -50,18 +70,19 @@ class BulkPositionService < BulkOperationService
       
       missing_ids = position_ids - positions.pluck(:id)
       unless missing_ids.empty?
-        raise BulkOperationError.new("Some positions not found", { missing_ids: missing_ids })
+        raise BulkOperationService::BulkOperationError.new("Some positions not found", { missing_ids: missing_ids })
       end
 
       department = Department.find_by(id: new_department_id)
       unless department
-        raise BulkOperationError.new("Department not found", { department_id: new_department_id })
+        raise BulkOperationService::BulkOperationError.new("Department not found", { department_id: new_department_id })
       end
 
       process_in_transaction(positions) do
         positions.each do |position|
           position.update!(department: department)
         end
+        positions.to_a
       end
     end
 
@@ -72,7 +93,7 @@ class BulkPositionService < BulkOperationService
         yield records
       end
     rescue ActiveRecord::RecordInvalid => e
-      raise BulkOperationError.new("Validation failed", e.record.errors.full_messages)
+      raise BulkOperationService::BulkOperationError.new("Validation failed", e.record.errors.full_messages)
     end
   end
 end 

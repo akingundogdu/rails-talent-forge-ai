@@ -10,7 +10,15 @@ class BulkDepartmentService < BulkOperationService
       validate_existence!(departments, 'parent_department_id', Department) if departments.any? { |d| d['parent_department_id'].present? }
       validate_existence!(departments, 'manager_id', Employee) if departments.any? { |d| d['manager_id'].present? }
 
-      super(Department, departments)
+      # Manual creation with our validation
+      created_departments = []
+      ActiveRecord::Base.transaction do
+        departments.each do |department_params|
+          department = Department.create!(department_params)
+          created_departments << department
+        end
+      end
+      created_departments
     end
 
     def bulk_update(departments)
@@ -19,7 +27,18 @@ class BulkDepartmentService < BulkOperationService
       validate_existence!(departments, 'parent_department_id', Department) if departments.any? { |d| d['parent_department_id'].present? }
       validate_existence!(departments, 'manager_id', Employee) if departments.any? { |d| d['manager_id'].present? }
 
-      super(Department, departments)
+      # Manual update with our validation
+      updated_departments = []
+      ActiveRecord::Base.transaction do
+        departments.each do |department_params|
+          id = department_params['id'] || department_params[:id]
+          department = Department.find(id)
+          update_params = department_params.except('id', :id)
+          department.update!(update_params)
+          updated_departments << department
+        end
+      end
+      updated_departments
     end
 
     def bulk_delete(department_ids)
@@ -28,19 +47,20 @@ class BulkDepartmentService < BulkOperationService
       
       missing_ids = department_ids - departments.pluck(:id)
       unless missing_ids.empty?
-        raise BulkOperationError.new("Some departments not found", { missing_ids: missing_ids })
+        raise BulkOperationService::BulkOperationError.new("Some departments not found", { missing_ids: missing_ids })
       end
 
       process_in_transaction(departments) do
         departments.each do |department|
           if department.employees.exists?
-            raise BulkOperationError.new(
+            raise BulkOperationService::BulkOperationError.new(
               "Cannot delete department with employees",
               { department_id: department.id }
             )
           end
           department.destroy!
         end
+        departments.to_a
       end
     end
 
@@ -51,7 +71,7 @@ class BulkDepartmentService < BulkOperationService
         yield records
       end
     rescue ActiveRecord::RecordInvalid => e
-      raise BulkOperationError.new("Validation failed", e.record.errors.full_messages)
+      raise BulkOperationService::BulkOperationError.new("Validation failed", e.record.errors.full_messages)
     end
   end
 end 
