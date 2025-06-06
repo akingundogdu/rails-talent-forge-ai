@@ -7,7 +7,7 @@ module Cacheable
     end
 
     def cached_find(id)
-      CacheService.fetch(cache_key_for(id), expires_in: 12.hours) do
+      Rails.cache.fetch([name.underscore.pluralize, id], expires_in: 1.hour) do
         find(id)
       end
     end

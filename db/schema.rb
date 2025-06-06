@@ -96,7 +96,9 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_05_134742) do
     t.datetime "locked_at"
     t.datetime "last_activity_at"
     t.datetime "encrypted_password_changed_at"
+    t.string "jti"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["jti"], name: "index_users_on_jti", unique: true
     t.index ["last_activity_at"], name: "index_users_on_last_activity_at"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["unlock_token"], name: "index_users_on_unlock_token", unique: true

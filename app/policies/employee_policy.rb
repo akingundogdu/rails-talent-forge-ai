@@ -35,6 +35,18 @@ class EmployeePolicy < ApplicationPolicy
     show?
   end
 
+  def bulk_create?
+    user.admin? || user.super_admin?
+  end
+
+  def manager?
+    show?
+  end
+
+  def search?
+    true
+  end
+
   private
 
   def manages_employee_department?

@@ -38,4 +38,16 @@ class DepartmentPolicy < ApplicationPolicy
   def org_chart?
     show?
   end
+
+  def bulk_create?
+    user.admin? || user.super_admin?
+  end
+
+  def employees?
+    show?
+  end
+
+  def positions?
+    show?
+  end
 end 

@@ -1,7 +1,7 @@
 module Api
   module V1
     class DepartmentsController < BaseController
-      before_action :set_department, only: [:show, :update, :destroy, :org_chart]
+      before_action :set_department, only: [:show, :update, :destroy, :org_chart, :employees, :positions]
 
       # GET /api/v1/departments
       def index
@@ -89,6 +89,18 @@ module Api
         else
           render json: { errors: result[:errors] }, status: :unprocessable_entity
         end
+      end
+
+      def employees
+        authorize @department
+        @employees = policy_scope(@department.employees)
+        render json: @employees
+      end
+
+      def positions
+        authorize @department
+        @positions = policy_scope(@department.positions)
+        render json: @positions
       end
 
       private

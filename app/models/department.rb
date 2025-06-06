@@ -11,7 +11,7 @@ class Department < ApplicationRecord
 
   # Validations
   validates :name, presence: true, uniqueness: { scope: :deleted_at }
-  validate :parent_department_cannot_be_self
+  validate :no_circular_hierarchy
   validate :manager_must_belong_to_department
 
   # Callbacks
@@ -87,9 +87,20 @@ class Department < ApplicationRecord
 
   private
 
-  def parent_department_cannot_be_self
-    if parent_department_id == id
-      errors.add(:parent_department_id, "can't be the same as the department")
+  def no_circular_hierarchy
+    return unless parent_department_id_changed? && parent_department_id.present?
+    
+    visited = Set.new
+    current = parent_department_id
+
+    while current.present?
+      if current == id || visited.include?(current)
+        errors.add(:parent_department_id, 'circular hierarchy is not allowed')
+        break
+      end
+
+      visited.add(current)
+      current = Department.find_by(id: current)&.parent_department_id
     end
   end
 

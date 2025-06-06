@@ -1,12 +1,13 @@
 module Api
   module V1
     class PositionsController < BaseController
-      before_action :set_position, only: [:show, :update, :destroy, :hierarchy]
+      before_action :set_position, only: [:show, :update, :destroy, :hierarchy, :employees]
 
       # GET /api/v1/positions
       def index
         @positions = policy_scope(Position)
-        @positions = paginate(@positions)
+        @positions = @positions.where(department_id: params[:department_id]) if params[:department_id].present?
+        @positions = @positions.page(params[:page]).per(params[:per_page])
         render json: @positions
       end
 
@@ -60,14 +61,25 @@ module Api
         render json: @positions, include: :parent_position
       end
 
+      def tree
+        @positions = policy_scope(Position.roots)
+        authorize Position, :tree?
+        render json: @positions.map(&:to_node)
+      end
+
+      def employees
+        authorize @position, :employees?
+        @employees = policy_scope(@position.employees)
+        render json: @employees
+      end
+
       def bulk_create
         authorize Position
-        result = BulkOperationService.bulk_create(Position, bulk_params, bulk_operation_options)
-        
-        if result[:errors].empty?
-          render json: result[:success], status: :created
+        result = BulkOperationService.bulk_create(Position, bulk_create_params, batch_size: params[:batch_size])
+        if result.success?
+          render json: result.records, status: :created
         else
-          render json: { errors: result[:errors] }, status: :unprocessable_entity
+          render json: { errors: result.errors }, status: :unprocessable_entity
         end
       end
 
@@ -101,6 +113,12 @@ module Api
 
       def position_params
         params.require(:position).permit(:title, :description, :level, :department_id, :parent_position_id)
+      end
+
+      def bulk_create_params
+        params.require(:positions).map do |position_params|
+          position_params.permit(:title, :description, :level, :department_id, :parent_position_id)
+        end
       end
 
       def bulk_params

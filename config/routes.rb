@@ -23,16 +23,25 @@ Rails.application.routes.draw do
         resources :permissions, only: [:index, :create, :destroy]
       end
 
+      resources :users, only: [] do
+        collection do
+          post :sign_in
+          post :sign_up
+          delete :sign_out
+          get :profile
+          put :update_profile
+          put :change_password
+        end
+      end
+
       resources :departments do
+        member do
+          get :employees
+          get :positions
+        end
         collection do
           get :tree
           post :bulk_create
-          patch :bulk_update
-          delete :bulk_delete
-        end
-        
-        member do
-          get :org_chart
         end
         
         resources :positions, only: [:index], controller: 'positions', action: 'by_department'
@@ -40,28 +49,31 @@ Rails.application.routes.draw do
       end
 
       resources :positions do
-        collection do
-          post :bulk_create
-          patch :bulk_update
-          delete :bulk_delete
-        end
-
         member do
-          get :hierarchy
+          get :employees
+        end
+        collection do
+          get :tree
+          post :bulk_create
         end
         
         resources :employees, only: [:index], controller: 'employees', action: 'by_position'
       end
 
       resources :employees do
-        collection do
-          post :bulk_create
-          patch :bulk_update
-          delete :bulk_delete
-        end
-
         member do
           get :subordinates
+          get :manager
+        end
+        collection do
+          get :search
+          post :bulk_create
+        end
+      end
+
+      resources :permissions, only: [:index, :show, :create, :update, :destroy] do
+        collection do
+          post :bulk_create
         end
       end
     end

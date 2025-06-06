@@ -2,25 +2,13 @@ class BulkOperationService
   class BulkOperationError < StandardError
     attr_reader :errors
 
-    def initialize(message = nil, errors = [])
+    def initialize(message, errors = [])
       super(message)
       @errors = errors
     end
   end
 
-  class << self
-    def bulk_create(model_class, records_params, options = {})
-      new(model_class, options).bulk_create(records_params)
-    end
-
-    def bulk_update(model_class, records_params, options = {})
-      new(model_class, options).bulk_update(records_params)
-    end
-
-    def bulk_delete(model_class, ids, options = {})
-      new(model_class, options).bulk_delete(ids)
-    end
-  end
+  BATCH_LIMIT = 50
 
   def initialize(model_class, options = {})
     @model_class = model_class
@@ -29,127 +17,132 @@ class BulkOperationService
     @validate_all = options.fetch(:validate_all, true)
   end
 
-  def bulk_create(records_params)
-    return { success: [], errors: [] } if records_params.empty?
-
-    results = { success: [], errors: [] }
-
-    ActiveRecord::Base.transaction do
-      records_params.each_slice(@batch_size) do |batch_params|
-        batch_results = process_create_batch(batch_params)
-        results[:success].concat(batch_results[:success])
-        results[:errors].concat(batch_results[:errors])
-      end
-
-      raise BulkOperationError.new("Bulk create failed", results[:errors]) if @validate_all && results[:errors].any?
+  class << self
+    def bulk_create(model_class, params, options = {})
+      new(model_class, options).bulk_create(params)
     end
 
-    results
-  rescue ActiveRecord::RecordInvalid => e
-    { success: [], errors: [{ record: e.record.attributes, errors: e.record.errors.full_messages }] }
+    def bulk_update(model_class, params, options = {})
+      new(model_class, options).bulk_update(params)
+    end
+
+    def bulk_delete(model_class, ids, options = {})
+      new(model_class, options).bulk_delete(ids)
+    end
   end
 
-  def bulk_update(records_params)
-    return { success: [], errors: [] } if records_params.empty?
+  def bulk_create(params)
+    validate_limit!(params)
+    validate_presence!(params, required_fields)
+    validate_uniqueness!(params, unique_fields) if unique_fields.any?
 
-    results = { success: [], errors: [] }
+    process_in_transaction do
+      results = { success: [], errors: [] }
 
-    ActiveRecord::Base.transaction do
-      records_params.each_slice(@batch_size) do |batch_params|
-        batch_results = process_update_batch(batch_params)
-        results[:success].concat(batch_results[:success])
-        results[:errors].concat(batch_results[:errors])
+      params.each do |param|
+        record = @model_class.new(param)
+        if record.save
+          results[:success] << record
+        else
+          results[:errors] << { record: param, errors: record.errors.full_messages }
+          raise ActiveRecord::Rollback if @validate_all
+        end
       end
 
-      raise BulkOperationError.new("Bulk update failed", results[:errors]) if @validate_all && results[:errors].any?
+      results
     end
+  end
 
-    results
-  rescue ActiveRecord::RecordInvalid => e
-    { success: [], errors: [{ record: e.record.attributes, errors: e.record.errors.full_messages }] }
+  def bulk_update(params)
+    validate_existence!(params.map { |p| p[:id] }, @model_class)
+
+    process_in_transaction do
+      results = { success: [], errors: [] }
+
+      params.each do |param|
+        record = @model_class.find(param[:id])
+        if record.update(param.except(:id))
+          results[:success] << record
+        else
+          results[:errors] << { record: param, errors: record.errors.full_messages }
+          raise ActiveRecord::Rollback if @validate_all
+        end
+      end
+
+      results
+    end
   end
 
   def bulk_delete(ids)
-    return { success: [], errors: [] } if ids.empty?
+    validate_existence!(ids, @model_class)
 
-    results = { success: [], errors: [] }
+    process_in_transaction do
+      results = { success: [], errors: [] }
 
-    ActiveRecord::Base.transaction do
-      ids.each_slice(@batch_size) do |batch_ids|
-        batch_results = process_delete_batch(batch_ids)
-        results[:success].concat(batch_results[:success])
-        results[:errors].concat(batch_results[:errors])
+      ids.each do |id|
+        record = @model_class.find(id)
+        if record.destroy
+          results[:success] << record
+        else
+          results[:errors] << { record: { id: id }, errors: record.errors.full_messages }
+          raise ActiveRecord::Rollback if @validate_all
+        end
       end
 
-      raise BulkOperationError.new("Bulk delete failed", results[:errors]) if @validate_all && results[:errors].any?
+      results
     end
-
-    results
-  rescue ActiveRecord::RecordNotFound => e
-    { success: [], errors: [{ message: e.message }] }
   end
 
   private
 
-  def process_create_batch(batch_params)
-    results = { success: [], errors: [] }
+  def validate_limit!(params)
+    raise BulkOperationError.new("Batch size exceeds limit of #{BATCH_LIMIT}") if params.size > BATCH_LIMIT
+  end
 
-    batch_params.each do |params|
-      record = @model_class.new(params)
-      
-      if record.save
-        results[:success] << record
-      else
-        results[:errors] << { record: params, errors: record.errors.full_messages }
-        raise ActiveRecord::Rollback unless @validate_all
-      end
+  def validate_presence!(params, fields)
+    missing_fields = params.each_with_object([]) do |param, acc|
+      missing = fields.select { |field| param[field.to_sym].blank? }
+      acc.concat(missing) if missing.any?
     end
 
+    raise BulkOperationError.new("Missing required fields: #{missing_fields.uniq.join(', ')}") if missing_fields.any?
+  end
+
+  def validate_uniqueness!(params, fields)
+    fields.each do |field|
+      values = params.map { |p| p[field.to_sym] }
+      duplicates = values.select { |v| values.count(v) > 1 }.uniq
+      raise BulkOperationError.new("Duplicate values found for #{field}: #{duplicates.join(', ')}") if duplicates.any?
+
+      existing = @model_class.where(field => values).pluck(field)
+      raise BulkOperationError.new("#{field.to_s.titleize} already exists: #{existing.join(', ')}") if existing.any?
+    end
+  end
+
+  def validate_existence!(ids, model_class)
+    existing_ids = model_class.where(id: ids).pluck(:id)
+    missing_ids = ids - existing_ids
+    raise BulkOperationError.new("#{model_class.name} not found with ids: #{missing_ids.join(', ')}") if missing_ids.any?
+  end
+
+  def process_in_transaction
+    results = nil
+    ActiveRecord::Base.transaction do
+      results = yield
+      raise ActiveRecord::Rollback if @validate_all && results[:errors].any?
+    end
     results
   end
 
-  def process_update_batch(batch_params)
-    results = { success: [], errors: [] }
-
-    batch_params.each do |params|
-      record = @model_class.find(params[:id])
-      
-      if record.update(params.except(:id))
-        results[:success] << record
-      else
-        results[:errors] << { record: params, errors: record.errors.full_messages }
-        raise ActiveRecord::Rollback unless @validate_all
-      end
-    end
-
-    results
-  rescue ActiveRecord::RecordNotFound => e
-    results[:errors] << { record: params, errors: [e.message] }
-    raise ActiveRecord::Rollback unless @validate_all
-    results
+  def required_fields
+    @model_class.validators.select { |v| v.is_a?(ActiveRecord::Validations::PresenceValidator) }
+      .flat_map(&:attributes)
+      .map(&:to_s)
   end
 
-  def process_delete_batch(batch_ids)
-    results = { success: [], errors: [] }
-
-    existing_records = @model_class.where(id: batch_ids)
-    missing_ids = batch_ids - existing_records.pluck(:id)
-
-    if missing_ids.any?
-      results[:errors] << { message: "Records not found with ids: #{missing_ids.join(', ')}" }
-      raise ActiveRecord::Rollback unless @validate_all
-    end
-
-    existing_records.each do |record|
-      if record.destroy
-        results[:success] << record.id
-      else
-        results[:errors] << { record: record.id, errors: record.errors.full_messages }
-        raise ActiveRecord::Rollback unless @validate_all
-      end
-    end
-
-    results
+  def unique_fields
+    @model_class.validators.select { |v| v.is_a?(ActiveRecord::Validations::UniquenessValidator) }
+      .flat_map(&:attributes)
+      .map(&:to_s)
   end
-end 
 end 

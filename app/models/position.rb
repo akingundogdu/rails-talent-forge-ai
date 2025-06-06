@@ -1,4 +1,5 @@
 class Position < ApplicationRecord
+  include Cacheable
   # Associations
   belongs_to :department
   belongs_to :parent_position, class_name: 'Position', optional: true
@@ -38,6 +39,22 @@ class Position < ApplicationRecord
 
   def ancestors_and_descendants
     [self] + ancestors + descendants
+  end
+
+  def to_node
+    {
+      id: id,
+      title: title,
+      description: description,
+      level: level,
+      department_id: department_id,
+      children: subordinate_positions.map(&:to_node)
+    }
+  end
+
+  # Class methods
+  def self.roots
+    top_level
   end
 
   private

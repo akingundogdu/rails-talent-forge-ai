@@ -1,13 +1,9 @@
 FactoryBot.define do
   factory :permission do
     association :user
-    resource { Permission::RESOURCES.sample }
-    action { Permission::ACTIONS.sample }
-    resource_id { nil }
-
-    trait :with_resource_id do
-      resource_id { create(resource.to_sym).id }
-    end
+    resource { 'department' }  # Default to department
+    action { 'read' }         # Default to read
+    resource_id { create(:department).id }  # Default to a department id
 
     trait :global do
       action { 'manage' }
@@ -16,17 +12,22 @@ FactoryBot.define do
 
     trait :department do
       resource { 'department' }
-      association :resource, factory: :department
+      resource_id { create(:department).id }
     end
 
     trait :position do
       resource { 'position' }
-      association :resource, factory: :position
+      resource_id { create(:position).id }
     end
 
     trait :employee do
       resource { 'employee' }
-      association :resource, factory: :employee
+      resource_id { create(:employee).id }
+    end
+
+    trait :user do
+      resource { 'user' }
+      resource_id { create(:user).id }
     end
   end
 end 

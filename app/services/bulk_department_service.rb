@@ -10,11 +10,7 @@ class BulkDepartmentService < BulkOperationService
       validate_existence!(departments, 'parent_department_id', Department) if departments.any? { |d| d['parent_department_id'].present? }
       validate_existence!(departments, 'manager_id', Employee) if departments.any? { |d| d['manager_id'].present? }
 
-      process_in_transaction(departments) do
-        departments.map do |dept_params|
-          Department.create!(dept_params)
-        end
-      end
+      super(Department, departments)
     end
 
     def bulk_update(departments)
@@ -23,13 +19,7 @@ class BulkDepartmentService < BulkOperationService
       validate_existence!(departments, 'parent_department_id', Department) if departments.any? { |d| d['parent_department_id'].present? }
       validate_existence!(departments, 'manager_id', Employee) if departments.any? { |d| d['manager_id'].present? }
 
-      process_in_transaction(departments) do
-        departments.map do |dept_params|
-          department = Department.find(dept_params['id'])
-          department.update!(dept_params.except('id'))
-          department
-        end
-      end
+      super(Department, departments)
     end
 
     def bulk_delete(department_ids)
@@ -52,6 +42,16 @@ class BulkDepartmentService < BulkOperationService
           department.destroy!
         end
       end
+    end
+
+    private
+
+    def process_in_transaction(records)
+      ActiveRecord::Base.transaction do
+        yield records
+      end
+    rescue ActiveRecord::RecordInvalid => e
+      raise BulkOperationError.new("Validation failed", e.record.errors.full_messages)
     end
   end
 end 

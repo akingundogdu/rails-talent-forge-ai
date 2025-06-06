@@ -10,11 +10,7 @@ class BulkPositionService < BulkOperationService
       validate_existence!(positions, 'department_id', Department)
       validate_existence!(positions, 'parent_position_id', Position) if positions.any? { |p| p['parent_position_id'].present? }
 
-      process_in_transaction(positions) do
-        positions.map do |pos_params|
-          Position.create!(pos_params)
-        end
-      end
+      super(Position, positions)
     end
 
     def bulk_update(positions)
@@ -23,13 +19,7 @@ class BulkPositionService < BulkOperationService
       validate_existence!(positions, 'department_id', Department) if positions.any? { |p| p['department_id'].present? }
       validate_existence!(positions, 'parent_position_id', Position) if positions.any? { |p| p['parent_position_id'].present? }
 
-      process_in_transaction(positions) do
-        positions.map do |pos_params|
-          position = Position.find(pos_params['id'])
-          position.update!(pos_params.except('id'))
-          position
-        end
-      end
+      super(Position, positions)
     end
 
     def bulk_delete(position_ids)
@@ -73,6 +63,16 @@ class BulkPositionService < BulkOperationService
           position.update!(department: department)
         end
       end
+    end
+
+    private
+
+    def process_in_transaction(records)
+      ActiveRecord::Base.transaction do
+        yield records
+      end
+    rescue ActiveRecord::RecordInvalid => e
+      raise BulkOperationError.new("Validation failed", e.record.errors.full_messages)
     end
   end
 end 

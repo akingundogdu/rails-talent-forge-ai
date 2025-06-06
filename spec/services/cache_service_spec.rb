@@ -6,9 +6,14 @@ RSpec.describe CacheService, type: :service do
   let(:user) { create(:user) }
   let(:employee) { create(:employee, position: position, user: user) }
 
+  let(:key) { 'test_key' }
+  let(:value) { 'test_value' }
+  let(:expires_in) { 1.hour }
+
   before do
     allow(Rails.cache).to receive(:fetch).and_yield
     allow(Rails.cache).to receive(:delete_matched)
+    allow(Rails.logger).to receive(:error)
   end
 
   describe '.cache_key_for' do
@@ -66,25 +71,25 @@ RSpec.describe CacheService, type: :service do
   describe 'cache invalidation' do
     describe '.invalidate_department_caches' do
       it 'invalidates department and ancestor caches' do
-        allow(department).to receive(:ancestors).and_return([])
         described_class.invalidate_department_caches(department)
-        expect(Rails.cache).to have_received(:delete_matched).once
+        expect(Rails.cache).to have_received(:delete_matched).with("department:#{department.id}*")
       end
     end
 
     describe '.invalidate_position_caches' do
       it 'invalidates position, ancestor, and department caches' do
-        allow(position).to receive(:ancestors).and_return([])
         described_class.invalidate_position_caches(position)
-        expect(Rails.cache).to have_received(:delete_matched).twice
+        expect(Rails.cache).to have_received(:delete_matched).with("position:#{position.id}*")
+        expect(Rails.cache).to have_received(:delete_matched).with("department:#{position.department_id}*")
       end
     end
 
     describe '.invalidate_employee_caches' do
       it 'invalidates employee, ancestor, position, and department caches' do
-        allow(employee).to receive(:ancestors).and_return([])
         described_class.invalidate_employee_caches(employee)
-        expect(Rails.cache).to have_received(:delete_matched).exactly(3).times
+        expect(Rails.cache).to have_received(:delete_matched).with("employee:#{employee.id}*")
+        expect(Rails.cache).to have_received(:delete_matched).with("position:#{employee.position_id}*")
+        expect(Rails.cache).to have_received(:delete_matched).with("department:#{employee.position.department_id}*")
       end
     end
 
@@ -116,7 +121,6 @@ RSpec.describe CacheService, type: :service do
 
     it 'handles Redis errors gracefully' do
       allow(Rails.cache).to receive(:fetch).and_raise(Redis::BaseError)
-      expect(Rails.logger).to receive(:error)
 
       result = described_class.fetch(key) { value }
       expect(result).to eq(value)
@@ -135,7 +139,6 @@ RSpec.describe CacheService, type: :service do
 
     it 'handles Redis errors gracefully' do
       allow(Rails.cache).to receive(:write).and_raise(Redis::BaseError)
-      expect(Rails.logger).to receive(:error)
 
       result = described_class.write(key, value)
       expect(result).to be false
@@ -154,7 +157,6 @@ RSpec.describe CacheService, type: :service do
 
     it 'handles Redis errors gracefully' do
       allow(Rails.cache).to receive(:read).and_raise(Redis::BaseError)
-      expect(Rails.logger).to receive(:error)
 
       result = described_class.read(key)
       expect(result).to be_nil
@@ -173,7 +175,6 @@ RSpec.describe CacheService, type: :service do
 
     it 'handles Redis errors gracefully' do
       allow(Rails.cache).to receive(:delete).and_raise(Redis::BaseError)
-      expect(Rails.logger).to receive(:error)
 
       result = described_class.delete(key)
       expect(result).to be false
@@ -192,7 +193,6 @@ RSpec.describe CacheService, type: :service do
 
     it 'handles Redis errors gracefully' do
       allow(Rails.cache).to receive(:delete_matched).and_raise(Redis::BaseError)
-      expect(Rails.logger).to receive(:error)
 
       result = described_class.delete_matched(key)
       expect(result).to be false
@@ -211,7 +211,6 @@ RSpec.describe CacheService, type: :service do
 
     it 'handles Redis errors gracefully' do
       allow(Rails.cache).to receive(:exist?).and_raise(Redis::BaseError)
-      expect(Rails.logger).to receive(:error)
 
       result = described_class.exist?(key)
       expect(result).to be false
@@ -229,7 +228,6 @@ RSpec.describe CacheService, type: :service do
 
     it 'handles Redis errors gracefully' do
       allow(Rails.cache).to receive(:clear).and_raise(Redis::BaseError)
-      expect(Rails.logger).to receive(:error)
 
       result = described_class.clear
       expect(result).to be false

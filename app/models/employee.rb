@@ -1,4 +1,5 @@
 class Employee < ApplicationRecord
+  include Cacheable
   # Associations
   belongs_to :position
   belongs_to :user

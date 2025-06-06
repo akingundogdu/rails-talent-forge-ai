@@ -6,7 +6,7 @@ RSpec.configure do |config|
   # Specify a root folder where Swagger JSON files are generated
   # NOTE: If you're using the rswag-api to serve API descriptions, you'll need
   # to ensure that it's configured to serve Swagger from the same folder
-  config.swagger_root = Rails.root.join('swagger').to_s
+  config.openapi_root = Rails.root.join('swagger').to_s
 
   # Define one or more Swagger documents and provide global metadata for each one
   # When you run the 'rswag:specs:swaggerize' rake task, the complete Swagger will
@@ -14,72 +14,24 @@ RSpec.configure do |config|
   # By default, the operations defined in spec files are added to the first
   # document below. You can override this behavior by adding a openapi_spec tag to the
   # the root example_group in your specs, e.g. describe '...', openapi_spec: 'v2/swagger.json'
-  config.swagger_docs = {
+  config.openapi_specs = {
     'v1/swagger.yaml' => {
       openapi: '3.0.1',
       info: {
-        title: 'Organization Chart API',
-        version: 'v1',
-        description: 'API documentation for Organization Chart management'
+        title: 'API V1',
+        version: 'v1'
       },
       paths: {},
       servers: [
         {
-          url: 'http://localhost:3500',
-          description: 'Development server'
-        }
-      ],
-      components: {
-        securitySchemes: {
-          bearer_auth: {
-            type: :http,
-            scheme: :bearer,
-            bearerFormat: 'JWT'
-          }
-        },
-        schemas: {
-          department: {
-            type: 'object',
-            properties: {
-              id: { type: 'integer' },
-              name: { type: 'string' },
-              description: { type: 'string' },
-              parent_department_id: { type: 'integer', nullable: true },
-              manager_id: { type: 'integer', nullable: true }
-            }
-          },
-          position: {
-            type: 'object',
-            properties: {
-              id: { type: 'integer' },
-              title: { type: 'string' },
-              description: { type: 'string' },
-              level: { type: 'integer' },
-              department_id: { type: 'integer' },
-              parent_position_id: { type: 'integer', nullable: true }
-            }
-          },
-          employee: {
-            type: 'object',
-            properties: {
-              id: { type: 'integer' },
-              first_name: { type: 'string' },
-              last_name: { type: 'string' },
-              email: { type: 'string' },
-              position_id: { type: 'integer' },
-              manager_id: { type: 'integer', nullable: true }
-            }
-          },
-          user: {
-            type: 'object',
-            properties: {
-              id: { type: 'integer' },
-              email: { type: 'string' },
-              role: { type: 'string', enum: ['user', 'admin', 'super_admin'] }
+          url: 'http://{defaultHost}',
+          variables: {
+            defaultHost: {
+              default: 'localhost:3000'
             }
           }
         }
-      }
+      ]
     }
   }
 

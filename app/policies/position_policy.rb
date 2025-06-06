@@ -35,6 +35,18 @@ class PositionPolicy < ApplicationPolicy
     show?
   end
 
+  def bulk_create?
+    user.admin? || user.super_admin?
+  end
+
+  def tree?
+    true
+  end
+
+  def employees?
+    show?
+  end
+
   private
 
   def manages_department?

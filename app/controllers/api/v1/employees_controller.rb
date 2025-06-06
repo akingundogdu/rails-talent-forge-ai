@@ -1,12 +1,13 @@
 module Api
   module V1
     class EmployeesController < BaseController
-      before_action :set_employee, only: [:show, :update, :destroy, :subordinates]
+      before_action :set_employee, only: [:show, :update, :destroy, :subordinates, :manager]
 
       # GET /api/v1/employees
       def index
         @employees = policy_scope(Employee)
-        @employees = paginate(@employees)
+        @employees = @employees.where('first_name ILIKE ? OR last_name ILIKE ?', "%#{params[:search]}%", "%#{params[:search]}%") if params[:search].present?
+        @employees = @employees.page(params[:page]).per(params[:per_page])
         render json: @employees
       end
 
@@ -49,7 +50,15 @@ module Api
       # GET /api/v1/employees/:id/subordinates
       def subordinates
         authorize @employee
-        render json: @employee.subordinates_tree
+        @subordinates = @employee.subordinates
+        render json: @subordinates
+      end
+
+      # GET /api/v1/employees/:id/manager
+      def manager
+        authorize @employee
+        @manager = @employee.manager
+        render json: @manager
       end
 
       # GET /api/v1/departments/:department_id/employees
@@ -68,14 +77,19 @@ module Api
         render json: @employees
       end
 
+      def search
+        @employees = policy_scope(Employee).where('first_name ILIKE ? OR last_name ILIKE ?', "%#{params[:query]}%", "%#{params[:query]}%")
+        authorize Employee, :search?
+        render json: @employees
+      end
+
       def bulk_create
         authorize Employee
-        result = BulkOperationService.bulk_create(Employee, bulk_params, bulk_operation_options)
-        
-        if result[:errors].empty?
-          render json: result[:success], status: :created
+        result = BulkOperationService.bulk_create(Employee, bulk_create_params, batch_size: params[:batch_size])
+        if result.success?
+          render json: result.records, status: :created
         else
-          render json: { errors: result[:errors] }, status: :unprocessable_entity
+          render json: { errors: result.errors }, status: :unprocessable_entity
         end
       end
 
@@ -112,6 +126,12 @@ module Api
           :first_name, :last_name, :email,
           :position_id, :manager_id, :user_id
         )
+      end
+
+      def bulk_create_params
+        params.require(:employees).map do |employee_params|
+          employee_params.permit(:first_name, :last_name, :email, :position_id)
+        end
       end
 
       def bulk_params

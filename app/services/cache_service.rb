@@ -44,32 +44,17 @@ class CacheService
 
     def invalidate_department_caches(department)
       Rails.cache.delete_matched("department:#{department.id}*")
-      department.ancestors.each do |ancestor|
-        Rails.cache.delete_matched("department:#{ancestor.id}*")
-      end
     end
 
     def invalidate_position_caches(position)
       Rails.cache.delete_matched("position:#{position.id}*")
-      position.ancestors.each do |ancestor|
-        Rails.cache.delete_matched("position:#{ancestor.id}*")
-      end
-      position.department.tap do |dept|
-        Rails.cache.delete_matched("department:#{dept.id}*")
-      end
+      Rails.cache.delete_matched("department:#{position.department_id}*")
     end
 
     def invalidate_employee_caches(employee)
       Rails.cache.delete_matched("employee:#{employee.id}*")
-      employee.ancestors.each do |ancestor|
-        Rails.cache.delete_matched("employee:#{ancestor.id}*")
-      end
-      employee.position.tap do |pos|
-        Rails.cache.delete_matched("position:#{pos.id}*")
-      end
-      employee.department.tap do |dept|
-        Rails.cache.delete_matched("department:#{dept.id}*")
-      end
+      Rails.cache.delete_matched("position:#{employee.position_id}*")
+      Rails.cache.delete_matched("department:#{employee.position.department_id}*")
     end
 
     def clear_all_caches
