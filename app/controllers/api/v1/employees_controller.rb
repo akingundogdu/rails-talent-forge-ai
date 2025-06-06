@@ -86,11 +86,13 @@ module Api
       def bulk_create
         authorize Employee
         result = BulkOperationService.bulk_create(Employee, bulk_create_params, batch_size: params[:batch_size])
-        if result.success?
-          render json: result.records, status: :created
+        if result[:errors].empty?
+          render json: result[:success], status: :created
         else
-          render json: { errors: result.errors }, status: :unprocessable_entity
+          render json: { errors: result[:errors] }, status: :unprocessable_entity
         end
+      rescue BulkOperationService::BulkOperationError => e
+        render json: { errors: [e.message] }, status: :unprocessable_entity
       end
 
       def bulk_update
@@ -118,7 +120,9 @@ module Api
       private
 
       def set_employee
-        @employee = Employee.cached_find(params[:id])
+        @employee = Employee.find(params[:id])
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Employee not found' }, status: :not_found
       end
 
       def employee_params
@@ -130,12 +134,14 @@ module Api
 
       def bulk_create_params
         params.require(:employees).map do |employee_params|
-          employee_params.permit(:first_name, :last_name, :email, :position_id)
+          employee_params.permit(:first_name, :last_name, :email, :position_id, :user_id)
         end
       end
 
       def bulk_params
-        params.require(:employees)
+        params.require(:employees).map do |emp_params|
+          emp_params.permit(:first_name, :last_name, :email, :position_id, :user_id, :manager_id)
+        end
       end
 
       def bulk_operation_options

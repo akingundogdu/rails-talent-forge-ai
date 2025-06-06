@@ -67,6 +67,8 @@ module Api
         else
           render json: { errors: result[:errors] }, status: :unprocessable_entity
         end
+      rescue BulkOperationService::BulkOperationError => e
+        render json: { errors: [e.message] }, status: :unprocessable_entity
       end
 
       def bulk_update
@@ -106,7 +108,9 @@ module Api
       private
 
       def set_department
-        @department = Department.cached_find(params[:id])
+        @department = Department.find(params[:id])
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Department not found' }, status: :not_found
       end
 
       def department_params
@@ -114,7 +118,9 @@ module Api
       end
 
       def bulk_params
-        params.require(:departments)
+        params.require(:departments).map do |dept_params|
+          dept_params.permit(:name, :description, :parent_department_id, :manager_id)
+        end
       end
 
       def bulk_operation_options

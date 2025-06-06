@@ -76,11 +76,13 @@ module Api
       def bulk_create
         authorize Position
         result = BulkOperationService.bulk_create(Position, bulk_create_params, batch_size: params[:batch_size])
-        if result.success?
-          render json: result.records, status: :created
+        if result[:errors].empty?
+          render json: result[:success], status: :created
         else
-          render json: { errors: result.errors }, status: :unprocessable_entity
+          render json: { errors: result[:errors] }, status: :unprocessable_entity
         end
+      rescue BulkOperationService::BulkOperationError => e
+        render json: { errors: [e.message] }, status: :unprocessable_entity
       end
 
       def bulk_update
@@ -108,7 +110,9 @@ module Api
       private
 
       def set_position
-        @position = Position.cached_find(params[:id])
+        @position = Position.find(params[:id])
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'Position not found' }, status: :not_found
       end
 
       def position_params
@@ -122,7 +126,9 @@ module Api
       end
 
       def bulk_params
-        params.require(:positions)
+        params.require(:positions).map do |pos_params|
+          pos_params.permit(:title, :description, :level, :department_id, :parent_position_id)
+        end
       end
 
       def bulk_operation_options

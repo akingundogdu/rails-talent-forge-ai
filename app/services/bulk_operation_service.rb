@@ -135,9 +135,20 @@ class BulkOperationService
   end
 
   def required_fields
-    @model_class.validators.select { |v| v.is_a?(ActiveRecord::Validations::PresenceValidator) }
+    presence_fields = @model_class.validators.select { |v| v.is_a?(ActiveRecord::Validations::PresenceValidator) }
       .flat_map(&:attributes)
       .map(&:to_s)
+    
+    # Convert belongs_to association names to foreign key names
+    belongs_to_associations = @model_class.reflect_on_all_associations(:belongs_to)
+    belongs_to_associations.each do |association|
+      if presence_fields.include?(association.name.to_s)
+        presence_fields.delete(association.name.to_s)
+        presence_fields << association.foreign_key.to_s
+      end
+    end
+    
+    presence_fields
   end
 
   def unique_fields
