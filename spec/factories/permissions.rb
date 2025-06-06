@@ -2,8 +2,8 @@ FactoryBot.define do
   factory :permission do
     association :user
     resource { 'department' }  # Default to department
-    action { 'read' }         # Default to read
-    resource_id { create(:department).id }  # Default to a department id
+    action { 'manage' }       # Default to manage (global permission)
+    resource_id { nil }       # Default to global permission
 
     trait :global do
       action { 'manage' }
