@@ -1,10 +1,8 @@
 class DepartmentPolicy < ApplicationPolicy
   class Scope < Scope
     def resolve
-      if user.super_admin?
+      if user.super_admin? || user.admin?
         scope.all
-      elsif user.admin?
-        scope.where(id: user.managed_departments.pluck(:id))
       else
         scope.where(id: user.employee&.department_id)
       end
@@ -24,11 +22,11 @@ class DepartmentPolicy < ApplicationPolicy
   end
 
   def update?
-    admin? && manages_department?
+    admin?
   end
 
   def destroy?
-    super_admin?
+    admin?
   end
 
   def tree?

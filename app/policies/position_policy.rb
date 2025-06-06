@@ -1,10 +1,8 @@
 class PositionPolicy < ApplicationPolicy
   class Scope < Scope
     def resolve
-      if user.super_admin?
+      if user.super_admin? || user.admin?
         scope.all
-      elsif user.admin?
-        scope.where(department_id: user.managed_departments.pluck(:id))
       else
         scope.where(department_id: user.employee&.department_id)
       end
@@ -24,11 +22,11 @@ class PositionPolicy < ApplicationPolicy
   end
 
   def update?
-    admin? && manages_department?
+    admin?
   end
 
   def destroy?
-    super_admin?
+    admin?
   end
 
   def hierarchy?
