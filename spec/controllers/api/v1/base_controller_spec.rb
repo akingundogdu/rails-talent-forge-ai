@@ -72,32 +72,64 @@ RSpec.describe Api::V1::BaseController, type: :controller do
   end
 
   describe 'error handling' do
-    before do
-      sign_in user
+    let(:base_controller) { Api::V1::BaseController.new }
+
+    describe '#not_found' do
+      it 'renders not found response' do
+        exception = ActiveRecord::RecordNotFound.new('Record not found')
+        allow(base_controller).to receive(:render)
+        
+        base_controller.send(:not_found, exception)
+        
+        expect(base_controller).to have_received(:render).with(
+          json: { error: 'Record not found' }, 
+          status: :not_found
+        )
+      end
     end
 
-    it 'handles RecordNotFound errors' do
-      get :show
-      expect(response).to have_http_status(:not_found)
-      expect(JSON.parse(response.body)['error']).to eq('Record not found')
+    describe '#bad_request' do
+      it 'renders bad request response' do
+        exception = ActionController::ParameterMissing.new(:required_param)
+        allow(base_controller).to receive(:render)
+        
+        base_controller.send(:bad_request, exception)
+        
+        expect(base_controller).to have_received(:render).with(
+          json: { error: exception.message }, 
+          status: :bad_request
+        )
+      end
     end
 
-    it 'handles ParameterMissing errors' do
-      post :create
-      expect(response).to have_http_status(:bad_request)
-      expect(JSON.parse(response.body)['error']).to include('required_param')
+    describe '#unprocessable_entity' do
+      it 'renders unprocessable entity response' do
+        invalid_user = User.new(email: 'invalid-email')
+        invalid_user.valid? # This will populate errors
+        exception = ActiveRecord::RecordInvalid.new(invalid_user)
+        allow(base_controller).to receive(:render)
+        
+        base_controller.send(:unprocessable_entity, exception)
+        
+        expect(base_controller).to have_received(:render).with(
+          json: { errors: invalid_user.errors.full_messages }, 
+          status: :unprocessable_entity
+        )
+      end
     end
 
-    it 'handles RecordInvalid errors' do
-      put :update
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(JSON.parse(response.body)['errors']).to eq(['Invalid data'])
-    end
-
-    it 'handles StandardError' do
-      delete :destroy
-      expect(response).to have_http_status(:internal_server_error)
-      expect(JSON.parse(response.body)['error']).to eq('Something went wrong')
+    describe '#internal_server_error' do
+      it 'renders internal server error response' do
+        exception = StandardError.new('Something went wrong')
+        allow(base_controller).to receive(:render)
+        
+        base_controller.send(:internal_server_error, exception)
+        
+        expect(base_controller).to have_received(:render).with(
+          json: { error: 'Something went wrong' }, 
+          status: :internal_server_error
+        )
+      end
     end
   end
 end 

@@ -4,7 +4,7 @@ RSpec.describe Api::V1::PermissionsController, type: :controller do
   let(:admin) { create(:user, :admin) }
   let(:user) { create(:user) }
   let(:department) { create(:department) }
-  let(:permission) { create(:permission, user: user, resource: 'department', action: 'read', resource_id: department.id) }
+  let(:permission) { create(:permission, :department, user: user, action: 'read') }
 
   before do
     sign_in admin
@@ -20,8 +20,10 @@ RSpec.describe Api::V1::PermissionsController, type: :controller do
     end
 
     context 'with resource filter' do
-      let!(:department_permission) { create(:permission, user: user, resource: 'department') }
-      let!(:position_permission) { create(:permission, user: user, resource: 'position') }
+      # Override parent permissions list to avoid interference
+      let!(:permissions) { nil }
+      let!(:department_permission) { create(:permission, resource: 'department', user: user) }
+      let!(:position_permission) { create(:permission, resource: 'position', user: user) }
 
       it 'filters permissions by resource' do
         get :index, params: { user_id: user.id, resource: 'department' }
@@ -87,13 +89,13 @@ RSpec.describe Api::V1::PermissionsController, type: :controller do
   end
 
   describe 'PUT #update' do
-    let(:new_attributes) { { action: 'write' } }
+    let(:new_attributes) { { action: 'update' } }
 
     context 'with valid params' do
       it 'updates the requested permission' do
         put :update, params: { user_id: user.id, id: permission.id, permission: new_attributes }
         permission.reload
-        expect(permission.action).to eq('write')
+        expect(permission.action).to eq('update')
         expect(response).to have_http_status(:ok)
       end
     end
@@ -127,7 +129,7 @@ RSpec.describe Api::V1::PermissionsController, type: :controller do
         },
         {
           resource: 'position',
-          action: 'write',
+          action: 'update',
           resource_id: create(:position).id
         }
       ]

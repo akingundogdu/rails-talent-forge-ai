@@ -105,7 +105,7 @@ RSpec.describe Api::V1::DepartmentsController, type: :controller do
     it 'returns departments in tree structure' do
       get :tree
       expect(response).to have_http_status(:ok)
-      expect(json_response.first['children']).to be_present
+      expect(json_response.first['sub_departments']).to be_present
     end
   end
 

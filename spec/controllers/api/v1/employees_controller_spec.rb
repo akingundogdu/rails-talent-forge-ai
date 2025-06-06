@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe Api::V1::EmployeesController, type: :controller do
   let(:user) { create(:user, :admin) }
   let(:department) { create(:department) }
-  let(:position) { create(:position, department: department) }
+  let(:position) { create(:position, department: department, level: 3) }
   let(:employee) { create(:employee, position: position) }
 
   before do
@@ -55,12 +55,14 @@ RSpec.describe Api::V1::EmployeesController, type: :controller do
   end
 
   describe 'POST #create' do
+    let(:employee_user) { create(:user) }
     let(:valid_attributes) do
       {
         first_name: 'John',
         last_name: 'Doe',
         email: 'john@example.com',
-        position_id: position.id
+        position_id: position.id,
+        user_id: employee_user.id
       }
     end
 
@@ -114,7 +116,7 @@ RSpec.describe Api::V1::EmployeesController, type: :controller do
 
   describe 'GET #subordinates' do
     let!(:subordinate_position) { create(:position, department: department, level: position.level - 1, parent_position: position) }
-    let!(:subordinate) { create(:employee, position: subordinate_position) }
+    let!(:subordinate) { create(:employee, position: subordinate_position, manager: employee) }
 
     it 'returns subordinates of the employee' do
       get :subordinates, params: { id: employee.id }
@@ -136,19 +138,23 @@ RSpec.describe Api::V1::EmployeesController, type: :controller do
   end
 
   describe 'POST #bulk_create' do
+    let(:employee_user1) { create(:user) }
+    let(:employee_user2) { create(:user) }
     let(:valid_attributes) do
       [
         {
           first_name: 'John',
           last_name: 'Doe',
           email: 'john@example.com',
-          position_id: position.id
+          position_id: position.id,
+          user_id: employee_user1.id
         },
         {
           first_name: 'Jane',
           last_name: 'Smith',
           email: 'jane@example.com',
-          position_id: position.id
+          position_id: position.id,
+          user_id: employee_user2.id
         }
       ]
     end
