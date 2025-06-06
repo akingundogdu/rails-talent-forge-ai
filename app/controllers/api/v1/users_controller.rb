@@ -90,7 +90,7 @@ module Api
       end
 
       def sign_up_params
-        params.require(:user).permit(:email, :password, :password_confirmation)
+        params.require(:user).permit(:email, :password, :password_confirmation, :role)
       end
 
       def update_profile_params
