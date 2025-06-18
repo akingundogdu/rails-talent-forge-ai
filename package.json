@@ -1,5 +1,5 @@
 {
-  "name": "railsbackend",
+  "name": "rails-talent-forge-ai",
   "private": true,
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",

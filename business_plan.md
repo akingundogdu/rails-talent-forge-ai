@@ -1,8 +1,8 @@
-# 🏢 HR MANAGEMENT SYSTEM - BUSINESS PLAN & PRODUCT ROADMAP
+# 🚀 RAILS TALENT FORGE AI - BUSINESS PLAN & PRODUCT ROADMAP
 
 ## 📋 **EXECUTIVE SUMMARY**
 
-Current foundation: **Enterprise-level Organizational Management System** with comprehensive user, department, position, and employee management capabilities.
+Current foundation: **Rails Talent Forge AI** - An enterprise-level Organizational Management System with comprehensive user, department, position, and employee management capabilities.
 
 **Goal:** Transform into a **complete HR ecosystem** serving SME to Enterprise market with multiple revenue streams.
 
