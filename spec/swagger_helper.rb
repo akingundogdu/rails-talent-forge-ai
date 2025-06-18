@@ -31,7 +31,16 @@ RSpec.configure do |config|
             }
           }
         }
-      ]
+      ],
+      components: {
+        securitySchemes: {
+          bearer_auth: {
+            type: :http,
+            scheme: :bearer,
+            bearerFormat: 'JWT'
+          }
+        }
+      }
     }
   }
 

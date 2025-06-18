@@ -7,6 +7,10 @@ RSpec.describe Api::V1::PositionsController, type: :controller do
 
   before do
     sign_in user
+    # Make admin user the manager of the department
+    admin_position = create(:position, department: department, level: 5)
+    admin_employee = create(:employee, user: user, position: admin_position)
+    department.update!(manager: admin_employee)
   end
 
   describe 'GET #index' do
@@ -15,7 +19,7 @@ RSpec.describe Api::V1::PositionsController, type: :controller do
     it 'returns a successful response' do
       get :index
       expect(response).to have_http_status(:ok)
-      expect(json_response.length).to eq(3)
+      expect(json_response.length).to eq(4) # 3 positions + 1 admin_position
     end
 
     context 'with department_id filter' do
@@ -24,7 +28,7 @@ RSpec.describe Api::V1::PositionsController, type: :controller do
 
       it 'filters positions by department' do
         get :index, params: { department_id: department.id }
-        expect(json_response.length).to eq(3)
+        expect(json_response.length).to eq(4) # 3 positions + 1 admin_position
         expect(json_response.map { |p| p['department_id'] }).to all(eq(department.id))
       end
     end
@@ -103,6 +107,11 @@ RSpec.describe Api::V1::PositionsController, type: :controller do
 
   describe 'DELETE #destroy' do
     let!(:position_to_delete) { create(:position, department: department) }
+    let(:super_admin_user) { create(:user, :super_admin) }
+
+    before do
+      sign_in super_admin_user
+    end
 
     it 'destroys the requested position' do
       expect {
@@ -119,7 +128,11 @@ RSpec.describe Api::V1::PositionsController, type: :controller do
     it 'returns positions in tree structure' do
       get :tree
       expect(response).to have_http_status(:ok)
-      expect(json_response.first['children']).to be_present
+      expect(json_response).to be_an(Array)
+      # Find the parent position in the response
+      parent_in_response = json_response.find { |p| p['id'] == parent_position.id }
+      expect(parent_in_response).to be_present
+      expect(parent_in_response['children']).to be_present if parent_in_response
     end
   end
 

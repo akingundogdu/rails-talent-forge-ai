@@ -1,8 +1,9 @@
 require 'rails_helper'
+require 'swagger_helper'
 
 RSpec.describe 'Department Bulk Operations', type: :request do
   let(:user) { create(:user, :admin) }
-  let(:headers) { auth_headers(user) }
+  let(:Authorization) { "Bearer #{JsonWebToken.encode(user_id: user.id)}" }
 
   describe 'POST /api/v1/departments/bulk_create' do
     let(:valid_attributes) do
@@ -15,9 +16,9 @@ RSpec.describe 'Department Bulk Operations', type: :request do
     context 'with valid parameters' do
       it 'creates multiple departments' do
         expect {
-          post bulk_create_api_v1_departments_path,
-               params: { departments: valid_attributes },
-               headers: headers
+                  post bulk_create_api_v1_departments_path,
+             params: { departments: valid_attributes },
+             headers: { Authorization: Authorization }
         }.to change(Department, :count).by(2)
 
         expect(response).to have_http_status(:created)
@@ -34,7 +35,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
 
         post bulk_create_api_v1_departments_path,
              params: { departments: large_attributes, batch_size: 5 },
-             headers: headers
+             headers: { Authorization: Authorization }
       end
     end
 
@@ -49,7 +50,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
       it 'returns error response' do
         post bulk_create_api_v1_departments_path,
              params: { departments: invalid_attributes },
-             headers: headers
+             headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -59,7 +60,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_departments_path,
                params: { departments: invalid_attributes },
-               headers: headers
+               headers: { Authorization: Authorization }
         }.not_to change(Department, :count)
       end
 
@@ -67,19 +68,19 @@ RSpec.describe 'Department Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_departments_path,
                params: { departments: invalid_attributes, validate_all: false },
-               headers: headers
+               headers: { Authorization: Authorization }
         }.to change(Department, :count).by(1)
       end
     end
 
     context 'with unauthorized user' do
       let(:unauthorized_user) { create(:user) }
-      let(:unauthorized_headers) { auth_headers(unauthorized_user) }
+      let(:unauthorized_Authorization) { "Bearer #{JsonWebToken.encode(user_id: unauthorized_user.id)}" }
 
       it 'returns unauthorized status' do
         post bulk_create_api_v1_departments_path,
              params: { departments: valid_attributes },
-             headers: unauthorized_headers
+             headers: { Authorization: unauthorized_Authorization }
 
         expect(response).to have_http_status(:forbidden)
       end
@@ -99,7 +100,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
       it 'updates multiple departments' do
         patch bulk_update_api_v1_departments_path,
               params: { departments: valid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:ok)
         expect(departments[0].reload.name).to eq('Updated Department 1')
@@ -118,7 +119,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
       it 'returns error response' do
         patch bulk_update_api_v1_departments_path,
               params: { departments: invalid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -127,7 +128,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
       it 'does not update any departments when validate_all is true' do
         patch bulk_update_api_v1_departments_path,
               params: { departments: invalid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(departments[0].reload.name).not_to eq('Valid Name')
       end
@@ -135,7 +136,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
       it 'updates valid departments when validate_all is false' do
         patch bulk_update_api_v1_departments_path,
               params: { departments: invalid_attributes, validate_all: false },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(departments[0].reload.name).to eq('Valid Name')
         expect(departments[1].reload.name).not_to eq('')
@@ -152,7 +153,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_departments_path,
                  params: { ids: department_ids },
-                 headers: headers
+                 headers: { Authorization: Authorization }
         }.to change(Department, :count).by(-3)
 
         expect(response).to have_http_status(:no_content)
@@ -165,7 +166,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
       it 'returns error response' do
         delete bulk_delete_api_v1_departments_path,
                params: { ids: invalid_ids },
-               headers: headers
+               headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -177,7 +178,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_departments_path,
                  params: { ids: mixed_ids, validate_all: false },
-                 headers: headers
+                 headers: { Authorization: Authorization }
         }.to change(Department, :count).by(-3)
       end
     end

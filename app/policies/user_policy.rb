@@ -10,11 +10,11 @@ class UserPolicy < ApplicationPolicy
   end
 
   def show?
-    user.super_admin? || record == user
+    user.super_admin? || user.admin? || record == user
   end
 
   def update?
-    show?
+    user.super_admin? || record == user
   end
 
   def sign_out?

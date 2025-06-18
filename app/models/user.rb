@@ -18,7 +18,7 @@ class User < ApplicationRecord
 
   # Associations
   has_one :employee
-  has_many :managed_departments, through: :employee, source: :managed_department
+  has_many :managed_departments, through: :employee, source: :managed_departments
   has_many :permissions, dependent: :destroy
 
   # Constants

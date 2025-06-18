@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_06_05_134742) do
+ActiveRecord::Schema[7.1].define(version: 2025_06_16_143340) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -46,12 +46,112 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_05_134742) do
     t.index ["user_id"], name: "index_employees_on_user_id"
   end
 
+  create_table "feedback_requests", force: :cascade do |t|
+    t.bigint "requester_id", null: false
+    t.bigint "recipient_id", null: false
+    t.text "message"
+    t.string "feedback_type"
+    t.string "status", default: "pending"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "deleted_at"
+    t.index ["recipient_id"], name: "index_feedback_requests_on_recipient_id"
+    t.index ["requester_id"], name: "index_feedback_requests_on_requester_id"
+  end
+
+  create_table "feedbacks", force: :cascade do |t|
+    t.bigint "giver_id", null: false
+    t.bigint "receiver_id", null: false
+    t.bigint "performance_review_id"
+    t.integer "feedback_type", default: 0, null: false
+    t.text "message", null: false
+    t.integer "rating"
+    t.boolean "anonymous", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.decimal "sentiment_score"
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_feedbacks_on_deleted_at"
+    t.index ["giver_id", "created_at"], name: "index_feedbacks_on_giver_id_and_created_at"
+    t.index ["giver_id"], name: "index_feedbacks_on_giver_id"
+    t.index ["performance_review_id", "feedback_type"], name: "index_feedbacks_on_performance_review_id_and_feedback_type"
+    t.index ["performance_review_id"], name: "index_feedbacks_on_performance_review_id"
+    t.index ["receiver_id", "feedback_type"], name: "index_feedbacks_on_receiver_id_and_feedback_type"
+    t.index ["receiver_id"], name: "index_feedbacks_on_receiver_id"
+  end
+
+  create_table "goals", force: :cascade do |t|
+    t.bigint "employee_id", null: false
+    t.bigint "performance_review_id"
+    t.string "title", null: false
+    t.text "description"
+    t.decimal "target_value", precision: 10, scale: 2
+    t.decimal "actual_value", precision: 10, scale: 2, default: "0.0"
+    t.integer "status", default: 0, null: false
+    t.integer "priority", default: 1, null: false
+    t.date "due_date", null: false
+    t.datetime "completed_at", precision: nil
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_goals_on_deleted_at"
+    t.index ["due_date", "status"], name: "index_goals_on_due_date_and_status"
+    t.index ["employee_id", "status"], name: "index_goals_on_employee_id_and_status"
+    t.index ["employee_id"], name: "index_goals_on_employee_id"
+    t.index ["performance_review_id"], name: "index_goals_on_performance_review_id"
+    t.index ["priority"], name: "index_goals_on_priority"
+  end
+
   create_table "jwt_denylists", force: :cascade do |t|
     t.string "jti"
     t.datetime "exp"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["jti"], name: "index_jwt_denylists_on_jti"
+  end
+
+  create_table "kpis", force: :cascade do |t|
+    t.bigint "employee_id", null: false
+    t.bigint "position_id"
+    t.string "name", null: false
+    t.text "description"
+    t.decimal "target_value", precision: 10, scale: 2, null: false
+    t.decimal "actual_value", precision: 10, scale: 2, default: "0.0"
+    t.string "measurement_unit", default: "number"
+    t.date "period_start", null: false
+    t.date "period_end", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "measurement_period"
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_kpis_on_deleted_at"
+    t.index ["employee_id", "period_start", "period_end"], name: "index_kpis_on_employee_id_and_period_start_and_period_end"
+    t.index ["employee_id"], name: "index_kpis_on_employee_id"
+    t.index ["position_id", "period_start", "period_end"], name: "index_kpis_on_position_id_and_period_start_and_period_end"
+    t.index ["position_id"], name: "index_kpis_on_position_id"
+    t.index ["status"], name: "index_kpis_on_status"
+  end
+
+  create_table "performance_reviews", force: :cascade do |t|
+    t.bigint "employee_id", null: false
+    t.bigint "reviewer_id", null: false
+    t.integer "status", default: 0, null: false
+    t.integer "review_type", default: 0, null: false
+    t.string "title", null: false
+    t.text "description"
+    t.date "start_date", null: false
+    t.date "end_date", null: false
+    t.datetime "completed_at", precision: nil
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "deleted_at"
+    t.index ["completed_at"], name: "index_performance_reviews_on_completed_at"
+    t.index ["deleted_at"], name: "index_performance_reviews_on_deleted_at"
+    t.index ["employee_id", "review_type"], name: "index_performance_reviews_on_employee_id_and_review_type"
+    t.index ["employee_id"], name: "index_performance_reviews_on_employee_id"
+    t.index ["reviewer_id"], name: "index_performance_reviews_on_reviewer_id"
+    t.index ["status", "start_date"], name: "index_performance_reviews_on_status_and_start_date"
   end
 
   create_table "permissions", force: :cascade do |t|
@@ -82,6 +182,22 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_05_134742) do
     t.index ["title"], name: "index_positions_on_title"
   end
 
+  create_table "ratings", force: :cascade do |t|
+    t.bigint "performance_review_id", null: false
+    t.string "competency_name", null: false
+    t.integer "score", null: false
+    t.text "comments"
+    t.decimal "weight", precision: 5, scale: 2, default: "1.0"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "deleted_at"
+    t.index ["deleted_at"], name: "index_ratings_on_deleted_at"
+    t.index ["performance_review_id", "competency_name"], name: "index_ratings_on_performance_review_id_and_competency_name", unique: true
+    t.index ["performance_review_id"], name: "index_ratings_on_performance_review_id"
+    t.index ["score"], name: "index_ratings_on_score"
+    t.check_constraint "score >= 1 AND score <= 5", name: "score_range_check"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -107,6 +223,18 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_05_134742) do
   add_foreign_key "departments", "employees", column: "manager_id"
   add_foreign_key "employees", "positions"
   add_foreign_key "employees", "users"
+  add_foreign_key "feedback_requests", "employees", column: "recipient_id"
+  add_foreign_key "feedback_requests", "employees", column: "requester_id"
+  add_foreign_key "feedbacks", "employees", column: "giver_id"
+  add_foreign_key "feedbacks", "employees", column: "receiver_id"
+  add_foreign_key "feedbacks", "performance_reviews"
+  add_foreign_key "goals", "employees"
+  add_foreign_key "goals", "performance_reviews"
+  add_foreign_key "kpis", "employees"
+  add_foreign_key "kpis", "positions"
+  add_foreign_key "performance_reviews", "employees"
+  add_foreign_key "performance_reviews", "employees", column: "reviewer_id"
   add_foreign_key "permissions", "users"
   add_foreign_key "positions", "departments"
+  add_foreign_key "ratings", "performance_reviews"
 end

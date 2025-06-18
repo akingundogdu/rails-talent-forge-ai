@@ -2,7 +2,7 @@ require 'swagger_helper'
 
 RSpec.describe 'Api::V1::Departments', type: :request do
   let(:user) { create(:user, :admin) }
-  let(:headers) { auth_headers(user) }
+  let(:Authorization) { "Bearer #{JsonWebToken.encode(user_id: user.id)}" }
 
   path '/api/v1/departments' do
     get 'Lists departments' do
@@ -22,7 +22,7 @@ RSpec.describe 'Api::V1::Departments', type: :request do
       end
 
       response '401', 'unauthorized' do
-        let(:headers) { {} }
+        let(:Authorization) { nil }
         run_test!
       end
     end
@@ -52,7 +52,7 @@ RSpec.describe 'Api::V1::Departments', type: :request do
       end
 
       response '401', 'unauthorized' do
-        let(:headers) { {} }
+        let(:Authorization) { nil }
         let(:department) { { name: 'New Department' } }
         run_test!
       end
@@ -93,7 +93,7 @@ RSpec.describe 'Api::V1::Departments', type: :request do
       end
 
       response '401', 'unauthorized' do
-        let(:headers) { {} }
+        let(:Authorization) { nil }
         run_test!
       end
 
@@ -127,7 +127,7 @@ RSpec.describe 'Api::V1::Departments', type: :request do
       end
 
       response '401', 'unauthorized' do
-        let(:headers) { {} }
+        let(:Authorization) { nil }
         let(:department) { { name: 'Updated Department' } }
         run_test!
       end
@@ -149,7 +149,7 @@ RSpec.describe 'Api::V1::Departments', type: :request do
       end
 
       response '401', 'unauthorized' do
-        let(:headers) { {} }
+        let(:Authorization) { nil }
         run_test!
       end
 
@@ -177,7 +177,7 @@ RSpec.describe 'Api::V1::Departments', type: :request do
       end
 
       response '401', 'unauthorized' do
-        let(:headers) { {} }
+        let(:Authorization) { nil }
         run_test!
       end
     end
@@ -204,7 +204,7 @@ RSpec.describe 'Api::V1::Departments', type: :request do
       end
 
       response '401', 'unauthorized' do
-        let(:headers) { {} }
+        let(:Authorization) { nil }
         run_test!
       end
 

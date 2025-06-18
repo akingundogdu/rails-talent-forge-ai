@@ -95,4 +95,5 @@ group :test do
   gem 'simplecov-json', require: false
   gem 'simplecov-lcov', require: false
   gem 'rails-controller-testing'
+  gem 'shoulda-matchers', '~> 5.0'
 end

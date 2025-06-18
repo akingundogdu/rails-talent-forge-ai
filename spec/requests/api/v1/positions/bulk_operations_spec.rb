@@ -1,8 +1,9 @@
 require 'rails_helper'
+require 'swagger_helper'
 
 RSpec.describe 'Position Bulk Operations', type: :request do
   let(:user) { create(:user, :admin) }
-  let(:headers) { auth_headers(user) }
+  let(:Authorization) { "Bearer #{JsonWebToken.encode(user_id: user.id)}" }
   let(:department) { create(:department) }
 
   describe 'POST /api/v1/positions/bulk_create' do
@@ -18,7 +19,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_positions_path,
                params: { positions: valid_attributes },
-               headers: headers
+               headers: { Authorization: Authorization }
         }.to change(Position, :count).by(2)
 
         expect(response).to have_http_status(:created)
@@ -37,7 +38,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
 
         post bulk_create_api_v1_positions_path,
              params: { positions: large_attributes, batch_size: 5 },
-             headers: headers
+             headers: { Authorization: Authorization }
       end
     end
 
@@ -52,7 +53,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
       it 'returns error response' do
         post bulk_create_api_v1_positions_path,
              params: { positions: invalid_attributes },
-             headers: headers
+             headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -62,7 +63,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_positions_path,
                params: { positions: invalid_attributes },
-               headers: headers
+               headers: { Authorization: Authorization }
         }.not_to change(Position, :count)
       end
 
@@ -70,19 +71,19 @@ RSpec.describe 'Position Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_positions_path,
                params: { positions: invalid_attributes, validate_all: false },
-               headers: headers
+               headers: { Authorization: Authorization }
         }.to change(Position, :count).by(1)
       end
     end
 
     context 'with unauthorized user' do
       let(:unauthorized_user) { create(:user) }
-      let(:unauthorized_headers) { auth_headers(unauthorized_user) }
+      let(:unauthorized_Authorization) { "Bearer #{JsonWebToken.encode(user_id: unauthorized_user.id)}" }
 
       it 'returns unauthorized status' do
         post bulk_create_api_v1_positions_path,
              params: { positions: valid_attributes },
-             headers: unauthorized_headers
+             headers: { Authorization: unauthorized_Authorization }
 
         expect(response).to have_http_status(:forbidden)
       end
@@ -102,7 +103,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
       it 'updates multiple positions' do
         patch bulk_update_api_v1_positions_path,
               params: { positions: valid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:ok)
         expect(positions[0].reload.title).to eq('Updated Position 1')
@@ -121,7 +122,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
       it 'returns error response' do
         patch bulk_update_api_v1_positions_path,
               params: { positions: invalid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -130,7 +131,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
       it 'does not update any positions when validate_all is true' do
         patch bulk_update_api_v1_positions_path,
               params: { positions: invalid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(positions[0].reload.title).not_to eq('Valid Title')
       end
@@ -138,7 +139,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
       it 'updates valid positions when validate_all is false' do
         patch bulk_update_api_v1_positions_path,
               params: { positions: invalid_attributes, validate_all: false },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(positions[0].reload.title).to eq('Valid Title')
         expect(positions[1].reload.title).not_to eq('')
@@ -155,7 +156,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_positions_path,
                  params: { ids: position_ids },
-                 headers: headers
+                 headers: { Authorization: Authorization }
         }.to change(Position, :count).by(-3)
 
         expect(response).to have_http_status(:no_content)
@@ -168,7 +169,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
       it 'returns error response' do
         delete bulk_delete_api_v1_positions_path,
                params: { ids: invalid_ids },
-               headers: headers
+               headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -180,7 +181,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_positions_path,
                  params: { ids: mixed_ids, validate_all: false },
-                 headers: headers
+                 headers: { Authorization: Authorization }
         }.to change(Position, :count).by(-3)
       end
     end
@@ -193,7 +194,7 @@ RSpec.describe 'Position Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_positions_path,
                  params: { ids: [position_with_employee.id] },
-                 headers: headers
+                 headers: { Authorization: Authorization }
         }.not_to change(Position, :count)
 
         expect(response).to have_http_status(:unprocessable_entity)

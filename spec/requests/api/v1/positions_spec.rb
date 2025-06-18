@@ -1,6 +1,9 @@
 require 'swagger_helper'
 
 RSpec.describe 'Api::V1::Positions', type: :request do
+  let(:user) { create(:user, :admin) }
+  let(:Authorization) { "Bearer #{JsonWebToken.encode(user_id: user.id)}" }
+
   path '/api/v1/positions' do
     get 'Lists positions' do
       tags 'Positions'

@@ -3,17 +3,17 @@ module Cacheable
 
   class_methods do
     def cache_key_for(id)
-      ["#{model_name.cache_key}", id]
+      [name, id]
     end
 
     def cached_find(id)
-      Rails.cache.fetch([name.underscore.pluralize, id], expires_in: 1.hour) do
+      CacheService.fetch(cache_key_for(id), expires_in: 12.hours) do
         find(id)
       end
     end
 
     def cached_where(conditions)
-      cache_key = ["#{model_name.cache_key}", 'where', conditions.to_s]
+      cache_key = [name, 'where', conditions.to_s]
       
       CacheService.fetch(cache_key, expires_in: 1.hour) do
         where(conditions).to_a
@@ -21,7 +21,7 @@ module Cacheable
     end
 
     def cached_count
-      CacheService.fetch("#{model_name.cache_key}:count", expires_in: 1.hour) do
+      CacheService.fetch("#{name}:count", expires_in: 1.hour) do
         count
       end
     end

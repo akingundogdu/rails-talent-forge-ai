@@ -122,10 +122,19 @@ RSpec.describe Api::V1::DepartmentsController, type: :controller do
   describe 'GET #positions' do
     let!(:position) { create(:position, department: department) }
 
+    before do
+      # Make admin user the manager of the department
+      admin_position = create(:position, department: department)
+      admin_employee = create(:employee, user: user, position: admin_position)
+      department.update!(manager: admin_employee)
+    end
+
     it 'returns positions in the department' do
       get :positions, params: { id: department.id }
       expect(response).to have_http_status(:ok)
-      expect(json_response.first['id']).to eq(position.id)
+      expect(json_response).to be_an(Array)
+      expect(json_response.length).to eq(2) # position + admin_position
+      expect(json_response.map { |p| p['id'] }).to include(position.id)
     end
   end
 

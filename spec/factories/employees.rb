@@ -33,5 +33,28 @@ FactoryBot.define do
                position: create(:position, department: employee.position.department))
       end
     end
+
+    trait :manager do
+      after(:create) do |employee|
+        # Create subordinate positions with lower level
+        subordinate_position = create(:position, 
+                                    department: employee.position.department,
+                                    level: employee.position.level - 1)
+        # Create a few subordinates for this manager
+        create_list(:employee, 3, manager: employee, position: subordinate_position)
+      end
+    end
+
+    trait :senior_manager do
+      manager
+      after(:create) do |employee|
+        # Create manager positions with lower level
+        manager_position = create(:position, 
+                                department: employee.position.department,
+                                level: employee.position.level - 1)
+        # Create managers reporting to this senior manager
+        create_list(:employee, 2, :manager, manager: employee, position: manager_position)
+      end
+    end
   end
 end 

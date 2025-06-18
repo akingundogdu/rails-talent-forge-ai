@@ -73,8 +73,8 @@ class BulkOperationService
 
   def bulk_create(params)
     validate_limit!(params)
-    validate_presence!(params, required_fields)
-    validate_uniqueness!(params, unique_fields) if unique_fields.any?
+    validate_presence!(params, required_fields) if @validate_all
+    validate_uniqueness!(params, unique_fields) if @validate_all && unique_fields.any?
 
     process_in_transaction do
       results = { success: [], errors: [] }
@@ -95,19 +95,24 @@ class BulkOperationService
 
   def bulk_update(params)
     ids = params.map { |p| p['id'] || p[:id] }.compact
-    validate_existence!(ids, @model_class)
+    validate_existence!(ids, @model_class) if @validate_all
 
     process_in_transaction do
       results = { success: [], errors: [] }
 
       params.each do |param|
         id = param['id'] || param[:id]
-        record = @model_class.find(id)
-        update_params = param.is_a?(Hash) ? param.except('id', :id) : param
-        if record.update(update_params)
-          results[:success] << record
-        else
-          results[:errors] << { record: param, errors: record.errors.full_messages }
+        begin
+          record = @model_class.find(id)
+          update_params = param.is_a?(Hash) ? param.except('id', :id) : param
+          if record.update(update_params)
+            results[:success] << record
+          else
+            results[:errors] << { record: param, errors: record.errors.full_messages }
+            raise ActiveRecord::Rollback if @validate_all
+          end
+        rescue ActiveRecord::RecordNotFound => e
+          results[:errors] << { record: param, errors: [e.message] }
           raise ActiveRecord::Rollback if @validate_all
         end
       end
@@ -117,17 +122,22 @@ class BulkOperationService
   end
 
   def bulk_delete(ids)
-    validate_existence!(ids, @model_class)
+    validate_existence!(ids, @model_class) if @validate_all
 
     process_in_transaction do
       results = { success: [], errors: [] }
 
       ids.each do |id|
-        record = @model_class.find(id)
-        if record.destroy
-          results[:success] << record
-        else
-          results[:errors] << { record: { id: id }, errors: record.errors.full_messages }
+        begin
+          record = @model_class.find(id)
+          if record.destroy
+            results[:success] << record
+          else
+            results[:errors] << { record: { id: id }, errors: record.errors.full_messages }
+            raise ActiveRecord::Rollback if @validate_all
+          end
+        rescue ActiveRecord::RecordNotFound => e
+          results[:errors] << { record: { id: id }, errors: [e.message] }
           raise ActiveRecord::Rollback if @validate_all
         end
       end
@@ -169,10 +179,14 @@ class BulkOperationService
   end
 
   def process_in_transaction
-    results = nil
+    results = { success: [], errors: [] }
     ActiveRecord::Base.transaction do
       results = yield
-      raise ActiveRecord::Rollback if @validate_all && results[:errors].any?
+      if @validate_all && results[:errors].any?
+        # Keep the errors but clear successes since transaction will rollback
+        results[:success] = []
+        raise ActiveRecord::Rollback
+      end
     end
     results
   end

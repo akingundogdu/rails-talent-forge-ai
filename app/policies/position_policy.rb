@@ -1,10 +1,14 @@
 class PositionPolicy < ApplicationPolicy
   class Scope < Scope
     def resolve
-      if user.super_admin? || user.admin?
+      if user.super_admin?
         scope.all
+      elsif user.admin?
+        # Admin users can only see positions from departments they manage
+        managed_dept_ids = user.employee&.managed_departments&.pluck(:id) || []
+        scope.where(department_id: managed_dept_ids)
       else
-        scope.where(department_id: user.employee&.department_id)
+        scope.where(department_id: user.employee&.department&.id)
       end
     end
   end
@@ -14,19 +18,22 @@ class PositionPolicy < ApplicationPolicy
   end
 
   def show?
-    admin? || record.department_id == user.employee&.department_id
+    super_admin? || 
+    (admin? && manages_department?) ||
+    record.department_id == user.employee&.department&.id
   end
 
   def create?
-    admin?
+    admin? || super_admin?
   end
 
   def update?
-    admin?
+    super_admin? || 
+    (admin? && manages_department?)
   end
 
   def destroy?
-    admin?
+    super_admin?
   end
 
   def hierarchy?
@@ -48,6 +55,6 @@ class PositionPolicy < ApplicationPolicy
   private
 
   def manages_department?
-    user.managed_departments.exists?(id: record.department_id)
+    user.employee&.managed_departments&.exists?(id: record.department_id)
   end
 end 

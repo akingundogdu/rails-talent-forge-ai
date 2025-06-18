@@ -1,8 +1,9 @@
 require 'rails_helper'
+require 'swagger_helper'
 
 RSpec.describe 'Employee Bulk Operations', type: :request do
   let(:user) { create(:user, :admin) }
-  let(:headers) { auth_headers(user) }
+  let(:Authorization) { "Bearer #{JsonWebToken.encode(user_id: user.id)}" }
   let(:department) { create(:department) }
   let(:position) { create(:position, department: department) }
 
@@ -29,7 +30,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_employees_path,
                params: { employees: valid_attributes },
-               headers: headers
+               headers: { Authorization: Authorization }
         }.to change(Employee, :count).by(2)
 
         expect(response).to have_http_status(:created)
@@ -53,7 +54,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
 
         post bulk_create_api_v1_employees_path,
              params: { employees: large_attributes, batch_size: 5 },
-             headers: headers
+             headers: { Authorization: Authorization }
       end
     end
 
@@ -78,7 +79,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
       it 'returns error response' do
         post bulk_create_api_v1_employees_path,
              params: { employees: invalid_attributes },
-             headers: headers
+             headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -88,7 +89,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_employees_path,
                params: { employees: invalid_attributes },
-               headers: headers
+               headers: { Authorization: Authorization }
         }.not_to change(Employee, :count)
       end
 
@@ -96,19 +97,19 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_employees_path,
                params: { employees: invalid_attributes, validate_all: false },
-               headers: headers
+               headers: { Authorization: Authorization }
         }.to change(Employee, :count).by(1)
       end
     end
 
     context 'with unauthorized user' do
       let(:unauthorized_user) { create(:user) }
-      let(:unauthorized_headers) { auth_headers(unauthorized_user) }
+      let(:unauthorized_Authorization) { "Bearer #{JsonWebToken.encode(user_id: unauthorized_user.id)}" }
 
       it 'returns unauthorized status' do
         post bulk_create_api_v1_employees_path,
              params: { employees: valid_attributes },
-             headers: unauthorized_headers
+             headers: { Authorization: unauthorized_Authorization }
 
         expect(response).to have_http_status(:forbidden)
       end
@@ -128,7 +129,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
       it 'updates multiple employees' do
         patch bulk_update_api_v1_employees_path,
               params: { employees: valid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:ok)
         expect(employees[0].reload.first_name).to eq('Updated First 1')
@@ -147,7 +148,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
       it 'returns error response' do
         patch bulk_update_api_v1_employees_path,
               params: { employees: invalid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -156,7 +157,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
       it 'does not update any employees when validate_all is true' do
         patch bulk_update_api_v1_employees_path,
               params: { employees: invalid_attributes },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(employees[0].reload.first_name).not_to eq('Valid Name')
       end
@@ -164,7 +165,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
       it 'updates valid employees when validate_all is false' do
         patch bulk_update_api_v1_employees_path,
               params: { employees: invalid_attributes, validate_all: false },
-              headers: headers
+              headers: { Authorization: Authorization }
 
         expect(employees[0].reload.first_name).to eq('Valid Name')
         expect(employees[1].reload.first_name).not_to eq('')
@@ -181,7 +182,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_employees_path,
                  params: { ids: employee_ids },
-                 headers: headers
+                 headers: { Authorization: Authorization }
         }.to change(Employee, :count).by(-3)
 
         expect(response).to have_http_status(:no_content)
@@ -194,7 +195,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
       it 'returns error response' do
         delete bulk_delete_api_v1_employees_path,
                params: { ids: invalid_ids },
-               headers: headers
+               headers: { Authorization: Authorization }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -206,7 +207,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_employees_path,
                  params: { ids: mixed_ids, validate_all: false },
-                 headers: headers
+                 headers: { Authorization: Authorization }
         }.to change(Employee, :count).by(-3)
       end
     end
@@ -219,7 +220,7 @@ RSpec.describe 'Employee Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_employees_path,
                  params: { ids: [manager.id] },
-                 headers: headers
+                 headers: { Authorization: Authorization }
         }.not_to change(Employee, :count)
 
         expect(response).to have_http_status(:unprocessable_entity)

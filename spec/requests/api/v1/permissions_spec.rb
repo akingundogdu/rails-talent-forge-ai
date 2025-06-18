@@ -1,8 +1,8 @@
 require 'swagger_helper'
 
 RSpec.describe 'Api::V1::Permissions', type: :request do
-  let(:admin) { create(:user, :admin) }
-  let(:headers) { auth_headers(admin) }
+  let(:user) { create(:user, :admin) }
+  let(:Authorization) { "Bearer #{JsonWebToken.encode(user_id: user.id)}" }
 
   path '/api/v1/users/{user_id}/permissions' do
     parameter name: :user_id, in: :path, type: :integer

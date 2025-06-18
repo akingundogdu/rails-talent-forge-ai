@@ -8,7 +8,8 @@ RSpec.describe PositionPolicy do
   let(:admin_user) { create(:user, :admin) }
   let(:super_admin_user) { create(:user, :super_admin) }
   
-  let(:employee) { create(:employee, department: department) }
+  let(:employee_position) { create(:position, department: department) }
+  let(:employee) { create(:employee, position: employee_position) }
   let(:user_with_employee) { create(:user) }
 
   before do
@@ -35,7 +36,10 @@ RSpec.describe PositionPolicy do
       let(:user) { admin_user }
       
       before do
-        admin_user.managed_departments << department1
+        # Create admin employee with position in department1
+        admin_position = create(:position, department: department1)
+        admin_employee = create(:employee, user: admin_user, position: admin_position)
+        department1.update!(manager: admin_employee)
       end
 
       it 'returns positions from managed departments' do
@@ -66,6 +70,11 @@ RSpec.describe PositionPolicy do
 
   describe '#show?' do
     it 'allows admin to view any position' do
+      # Setup admin as manager of the department
+      admin_position = create(:position, department: department)
+      admin_employee = create(:employee, user: admin_user, position: admin_position)
+      department.update!(manager: admin_employee)
+      
       policy = described_class.new(admin_user, position)
       expect(policy.show?).to be true
     end
@@ -77,7 +86,9 @@ RSpec.describe PositionPolicy do
     end
 
     it 'denies users from viewing positions in other departments' do
-      policy = described_class.new(user_with_employee, position)
+      other_department = create(:department)
+      other_position = create(:position, department: other_department)
+      policy = described_class.new(user_with_employee, other_position)
       expect(policy.show?).to be false
     end
   end
@@ -97,7 +108,10 @@ RSpec.describe PositionPolicy do
   describe '#update?' do
     context 'when user is admin' do
       before do
-        admin_user.managed_departments << department
+        # Create admin employee with position in department
+        admin_position = create(:position, department: department)
+        admin_employee = create(:employee, user: admin_user, position: admin_position)
+        department.update!(manager: admin_employee)
       end
 
       it 'allows admin to update positions in managed departments' do
@@ -137,6 +151,11 @@ RSpec.describe PositionPolicy do
 
   describe '#hierarchy?' do
     it 'follows the same rules as show?' do
+      # Setup admin as manager of the department
+      admin_position = create(:position, department: department)
+      admin_employee = create(:employee, user: admin_user, position: admin_position)
+      department.update!(manager: admin_employee)
+      
       policy = described_class.new(admin_user, position)
       expect(policy.hierarchy?).to be true
       
@@ -144,7 +163,9 @@ RSpec.describe PositionPolicy do
       policy = described_class.new(user_with_employee, position_in_dept)
       expect(policy.hierarchy?).to be true
       
-      policy = described_class.new(user_with_employee, position)
+      other_department = create(:department)
+      other_position = create(:position, department: other_department)
+      policy = described_class.new(user_with_employee, other_position)
       expect(policy.hierarchy?).to be false
     end
   end
@@ -170,7 +191,10 @@ RSpec.describe PositionPolicy do
     let(:policy) { described_class.new(admin_user, position) }
 
     before do
-      admin_user.managed_departments << department
+      # Create admin employee with position in department
+      admin_position = create(:position, department: department)
+      admin_employee = create(:employee, user: admin_user, position: admin_position)
+      department.update!(manager: admin_employee)
     end
 
     it 'returns true when admin manages the department' do

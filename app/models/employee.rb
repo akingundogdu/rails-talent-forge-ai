@@ -9,6 +9,14 @@ class Employee < ApplicationRecord
   belongs_to :manager, class_name: 'Employee', optional: true
   has_many :subordinates, class_name: 'Employee', foreign_key: 'manager_id'
 
+  # Performance Management Associations
+  has_many :performance_reviews, dependent: :destroy
+  has_many :reviewed_performance_reviews, class_name: 'PerformanceReview', foreign_key: 'reviewer_id', dependent: :nullify
+  has_many :goals, dependent: :destroy
+  has_many :kpis, dependent: :destroy
+  has_many :given_feedbacks, class_name: 'Feedback', foreign_key: 'giver_id', dependent: :destroy
+  has_many :received_feedbacks, class_name: 'Feedback', foreign_key: 'receiver_id', dependent: :destroy
+
   # Validations
   validates :first_name, :last_name, presence: true
   validates :email, presence: true, uniqueness: { case_sensitive: false }, 
@@ -45,6 +53,67 @@ class Employee < ApplicationRecord
   def subordinates_tree
     Employee.where(id: all_subordinates.map(&:id))
            .includes(:position, :department)
+  end
+
+  # Performance Management Methods
+  def current_performance_review
+    performance_reviews.active.first
+  end
+
+  def latest_performance_review
+    performance_reviews.order(created_at: :desc).first
+  end
+
+  def active_goals
+    goals.active_goals
+  end
+
+  def overdue_goals
+    goals.overdue_goals
+  end
+
+  def current_kpis
+    kpis.current_period
+  end
+
+  def feedback_summary(months = 12)
+    Feedback.feedback_summary_for_employee(id, months.months.ago, Date.current)
+  end
+
+  def performance_score_trend(months = 6)
+    performance_reviews.completed_in_period(months.months.ago, Date.current)
+                      .joins(:ratings)
+                      .group("DATE_TRUNC('month', performance_reviews.completed_at)")
+                      .average('ratings.score')
+  end
+
+  def goal_completion_rate
+    total_goals = goals.count
+    return 0 if total_goals.zero?
+    
+    completed_goals = goals.completed_goals.count
+    (completed_goals.to_f / total_goals * 100).round(2)
+  end
+
+  def kpi_achievement_average
+    current_kpis.average('actual_value / target_value * 100')&.round(2) || 0
+  end
+
+  def needs_performance_review?
+    return true unless latest_performance_review
+    
+    latest_performance_review.completed_at < 1.year.ago
+  end
+
+  def can_review?(reviewee)
+    # Can review if manager, admin, or HR
+    return true if self == reviewee.manager
+    return true if user.admin? || user.super_admin?
+    
+    # Peer review if in same department and sufficient level
+    return true if department == reviewee.department && position.level >= reviewee.position.level
+    
+    false
   end
 
   private

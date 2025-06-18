@@ -19,8 +19,8 @@ RSpec.describe Cacheable do
   end
 
   describe '.cached_where' do
-    let!(:departments) { create_list(:department, 3, name: 'Test Department') }
-    let(:conditions) { { name: 'Test Department' } }
+    let!(:test_department) { create(:department, name: 'Unique Test Department') }
+    let(:conditions) { { name: 'Unique Test Department' } }
 
     it 'caches the query results' do
       cache_key = ['Department', 'where', conditions.to_s]
@@ -34,7 +34,8 @@ RSpec.describe Cacheable do
 
     it 'returns the correct records' do
       results = Department.cached_where(conditions)
-      expect(results).to match_array(departments)
+      expect(results.length).to eq(1)
+      expect(results.first.name).to eq('Unique Test Department')
     end
   end
 

@@ -76,6 +76,92 @@ Rails.application.routes.draw do
           post :bulk_create
         end
       end
+
+      # Performance Management Routes
+      resources :performance_reviews do
+        member do
+          post :submit
+          post :approve
+          post :complete
+          get :feedback_summary
+          get :summary
+        end
+        collection do
+          get :analytics
+        end
+        
+        resources :goals, except: [:show], controller: 'goals', action: 'by_review'
+        resources :feedbacks, except: [:show], controller: 'feedbacks', action: 'by_review'
+        resources :ratings, except: [:show], controller: 'ratings', action: 'by_review'
+      end
+
+      resources :goals do
+        member do
+          put :update_progress
+          post :complete
+          post :pause
+          post :resume
+          post :cancel
+        end
+        collection do
+          post :bulk_update_progress
+          get :overdue
+          get :due_soon
+          get :analytics
+        end
+      end
+
+      resources :kpis do
+        member do
+          put :update_progress
+          post :complete
+          post :archive
+        end
+        collection do
+          get :dashboard
+          get :benchmarks
+          get :trending
+          get :trends
+          get :analytics
+          post :bulk_create_for_position
+          post :bulk_update
+        end
+      end
+
+      resources :feedbacks do
+        member do
+          put :update_feedback
+        end
+        collection do
+          post :request_peer_feedback
+          post :request_feedback
+          post :create_360_request
+          get :analytics
+          get :trends
+          get :themes
+          get :summary
+        end
+      end
+
+      resources :ratings do
+        collection do
+          post :bulk_create_for_review
+          get :competency_benchmarks
+          get :department_gaps
+        end
+      end
+
+      # Performance Analytics Routes
+      namespace :analytics do
+        resources :performance, only: [] do
+          collection do
+            get :summary
+            get :department_metrics
+            get :employee_trends
+            get :competency_analysis
+          end
+        end
+      end
     end
   end
 end
