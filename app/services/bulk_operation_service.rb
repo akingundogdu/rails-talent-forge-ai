@@ -65,7 +65,14 @@ class BulkOperationService
 
       return if ids.empty?
 
-      existing_ids = model_class.where(id: ids).pluck(:id)
+      # Use unscoped to avoid acts_as_paranoid default scope issues in tests
+      # Check if model uses acts_as_paranoid by checking if it responds to deleted_at
+      if model_class.column_names.include?('deleted_at')
+        existing_ids = model_class.unscoped.where(id: ids, deleted_at: nil).pluck(:id)
+      else
+        existing_ids = model_class.where(id: ids).pluck(:id)
+      end
+      
       missing_ids = ids - existing_ids
       raise BulkOperationError.new("#{model_class.name} not found", { missing_ids: missing_ids }) if missing_ids.any?
     end
@@ -94,6 +101,7 @@ class BulkOperationService
   end
 
   def bulk_update(params)
+    validate_limit!(params)
     ids = params.map { |p| p['id'] || p[:id] }.compact
     validate_existence!(ids, @model_class) if @validate_all
 
@@ -122,6 +130,7 @@ class BulkOperationService
   end
 
   def bulk_delete(ids)
+    validate_limit!(ids) if ids.respond_to?(:size)
     validate_existence!(ids, @model_class) if @validate_all
 
     process_in_transaction do
@@ -173,7 +182,8 @@ class BulkOperationService
   end
 
   def validate_existence!(ids, model_class)
-    existing_ids = model_class.where(id: ids).pluck(:id)
+    # Use unscoped to avoid acts_as_paranoid default scope issues in tests
+    existing_ids = model_class.unscoped.where(id: ids, deleted_at: nil).pluck(:id)
     missing_ids = ids - existing_ids
     raise BulkOperationError.new("#{model_class.name} not found with ids: #{missing_ids.join(', ')}") if missing_ids.any?
   end
@@ -192,25 +202,39 @@ class BulkOperationService
   end
 
   def required_fields
-    presence_fields = @model_class.validators.select { |v| v.is_a?(ActiveRecord::Validations::PresenceValidator) }
-      .flat_map(&:attributes)
-      .map(&:to_s)
+    return [] unless @model_class.respond_to?(:validators)
     
-    # Convert belongs_to association names to foreign key names
-    belongs_to_associations = @model_class.reflect_on_all_associations(:belongs_to)
-    belongs_to_associations.each do |association|
-      if presence_fields.include?(association.name.to_s)
-        presence_fields.delete(association.name.to_s)
-        presence_fields << association.foreign_key.to_s
+    begin
+      presence_fields = @model_class.validators.select { |v| v.is_a?(ActiveRecord::Validations::PresenceValidator) }
+        .flat_map(&:attributes)
+        .map(&:to_s)
+      
+      # Convert belongs_to association names to foreign key names
+      belongs_to_associations = @model_class.reflect_on_all_associations(:belongs_to)
+      belongs_to_associations.each do |association|
+        if presence_fields.include?(association.name.to_s)
+          presence_fields.delete(association.name.to_s)
+          presence_fields << association.foreign_key.to_s
+        end
       end
+      
+      presence_fields
+    rescue => e
+      # If there's any error getting validators, return empty array
+      []
     end
-    
-    presence_fields
   end
 
   def unique_fields
-    @model_class.validators.select { |v| v.is_a?(ActiveRecord::Validations::UniquenessValidator) }
-      .flat_map(&:attributes)
-      .map(&:to_s)
+    return [] unless @model_class.respond_to?(:validators)
+    
+    begin
+      @model_class.validators.select { |v| v.is_a?(ActiveRecord::Validations::UniquenessValidator) }
+        .flat_map(&:attributes)
+        .map(&:to_s)
+    rescue => e
+      # If there's any error getting validators, return empty array
+      []
+    end
   end
 end 

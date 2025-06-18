@@ -60,7 +60,8 @@ module Api
 
       def bulk_create
         authorize Department
-        result = BulkOperationService.bulk_create(Department, bulk_params, bulk_operation_options)
+        
+        result = BulkOperationService.bulk_create(Department, bulk_params_as_hash, bulk_operation_options)
         
         if result[:errors].empty?
           render json: result[:success], status: :created
@@ -69,11 +70,31 @@ module Api
         end
       rescue BulkOperationService::BulkOperationError => e
         render json: { errors: [e.message] }, status: :unprocessable_entity
+      rescue Pundit::NotAuthorizedError
+        render json: { errors: ['Unauthorized'] }, status: :forbidden
       end
 
       def bulk_update
         authorize Department
-        result = BulkOperationService.bulk_update(Department, bulk_params, bulk_operation_options)
+        
+        # Simple parameter processing without complex methods
+        departments_data = params[:departments] || []
+        processed_params = departments_data.map do |dept|
+          {
+            'id' => dept[:id] || dept['id'],
+            'name' => dept[:name] || dept['name'],
+            'description' => dept[:description] || dept['description'],
+            'parent_department_id' => dept[:parent_department_id] || dept['parent_department_id'],
+            'manager_id' => dept[:manager_id] || dept['manager_id']
+          }.compact
+        end
+        
+        options = {
+          batch_size: (params[:batch_size] || 100).to_i,
+          validate_all: params[:validate_all] != 'false'
+        }
+        
+        result = BulkOperationService.bulk_update(Department, processed_params, options)
         
         if result[:errors].empty?
           render json: result[:success]
@@ -84,13 +105,24 @@ module Api
 
       def bulk_delete
         authorize Department
-        result = BulkOperationService.bulk_delete(Department, params[:ids], bulk_operation_options)
+        
+        ids = params[:ids] || []
+        options = {
+          batch_size: (params[:batch_size] || 100).to_i,
+          validate_all: params[:validate_all] != 'false'
+        }
+        
+        result = BulkOperationService.bulk_delete(Department, ids, options)
         
         if result[:errors].empty?
           head :no_content
         else
           render json: { errors: result[:errors] }, status: :unprocessable_entity
         end
+      rescue BulkOperationService::BulkOperationError => e
+        render json: { errors: [e.message] }, status: :unprocessable_entity
+      rescue Pundit::NotAuthorizedError
+        render json: { errors: ['Unauthorized'] }, status: :forbidden
       end
 
       def employees
@@ -123,9 +155,13 @@ module Api
         end
       end
 
+      def bulk_params_as_hash
+        bulk_params.map(&:to_h)
+      end
+
       def bulk_operation_options
         {
-          batch_size: params[:batch_size] || 100,
+          batch_size: (params[:batch_size] || 100).to_i,
           validate_all: params[:validate_all] != 'false'
         }
       end

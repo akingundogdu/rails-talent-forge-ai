@@ -41,6 +41,14 @@ class DepartmentPolicy < ApplicationPolicy
     user.admin? || user.super_admin?
   end
 
+  def bulk_update?
+    user.admin? || user.super_admin?
+  end
+
+  def bulk_delete?
+    user.admin? || user.super_admin?
+  end
+
   def employees?
     show?
   end

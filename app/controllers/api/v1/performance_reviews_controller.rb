@@ -1,7 +1,7 @@
 class Api::V1::PerformanceReviewsController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_performance_review, only: [:show, :update, :destroy, :submit, :approve, :complete, :feedback_summary]
-  before_action :authorize_review_access, only: [:show, :update, :destroy, :submit, :approve, :complete]
+  before_action :set_performance_review, only: [:show, :update, :destroy, :submit, :approve, :complete, :feedback_summary, :summary]
+  before_action :authorize_review_access, only: [:show, :update, :destroy, :submit, :approve, :complete, :summary]
 
   # GET /api/v1/performance_reviews
   def index
@@ -55,13 +55,20 @@ class Api::V1::PerformanceReviewsController < ApplicationController
       }, status: :created
     else
       render json: {
-        errors: @performance_review.errors.full_messages
+        errors: format_validation_errors(@performance_review.errors)
       }, status: :unprocessable_entity
     end
   end
 
   # PUT /api/v1/performance_reviews/:id
   def update
+    # Check if review can be updated
+    if @performance_review.status_completed?
+      return render json: {
+        error: 'Completed reviews cannot be updated'
+      }, status: :unprocessable_entity
+    end
+
     if @performance_review.update(performance_review_params)
       render json: {
         data: performance_review_detail_json(@performance_review),
@@ -69,26 +76,38 @@ class Api::V1::PerformanceReviewsController < ApplicationController
       }
     else
       render json: {
-        errors: @performance_review.errors.full_messages
+        errors: format_validation_errors(@performance_review.errors)
       }, status: :unprocessable_entity
     end
   end
 
   # DELETE /api/v1/performance_reviews/:id
   def destroy
+    # Check if review can be deleted
+    if @performance_review.status_completed?
+      return render json: {
+        error: 'Completed reviews cannot be deleted'
+      }, status: :unprocessable_entity
+    end
+
     if @performance_review.destroy
-      render json: {
-        message: 'Performance review deleted successfully'
-      }
+      head :no_content
     else
       render json: {
-        errors: @performance_review.errors.full_messages
+        errors: format_validation_errors(@performance_review.errors)
       }, status: :unprocessable_entity
     end
   end
 
   # POST /api/v1/performance_reviews/:id/submit
   def submit
+    # Check if review has sufficient data
+    if @performance_review.goals.empty?
+      return render json: {
+        error: 'Cannot submit review with insufficient data - at least one goal is required'
+      }, status: :unprocessable_entity
+    end
+
     if @performance_review.submit_for_review!
       render json: {
         data: performance_review_detail_json(@performance_review),
@@ -107,20 +126,27 @@ class Api::V1::PerformanceReviewsController < ApplicationController
       return render json: { errors: ['Unauthorized to approve this review'] }, status: :forbidden
     end
 
-    if @performance_review.update(status: :in_progress)
+    if @performance_review.update(status: :completed, completed_at: Time.current)
       render json: {
         data: performance_review_detail_json(@performance_review),
-        message: 'Performance review approved and started'
+        message: 'Performance review approved and completed'
       }
     else
       render json: {
-        errors: @performance_review.errors.full_messages
+        errors: format_validation_errors(@performance_review.errors)
       }, status: :unprocessable_entity
     end
   end
 
   # POST /api/v1/performance_reviews/:id/complete
   def complete
+    # Check completion requirements
+    if @performance_review.ratings.empty?
+      return render json: {
+        error: 'Cannot complete review - completion requirements not met (ratings required)'
+      }, status: :unprocessable_entity
+    end
+
     completion_notes = params[:completion_notes]
     
     if @performance_review.complete_review!(completion_notes)
@@ -166,27 +192,32 @@ class Api::V1::PerformanceReviewsController < ApplicationController
       return
     end
     
-    reviews = PerformanceReview.where(employee_id: employee_id)
-    
-    analytics_data = {
-      total_reviews: reviews.count,
-      completed_reviews: reviews.where(status: 'completed').count,
-      average_score: reviews.joins(:ratings).average('ratings.score')&.round(2) || 0,
-      review_history: reviews.order(:created_at).limit(10).map do |review|
-        {
-          id: review.id,
-          title: review.title,
-          status: review.status,
-          created_at: review.created_at
-        }
-      end
-    }
+    # Use caching for expensive analytics calculations
+    cache_key = "performance_review_#{employee_id}_analytics"
+    analytics_data = Rails.cache.fetch(cache_key, expires_in: 1.hour) do
+      reviews = PerformanceReview.where(employee_id: employee_id)
+      
+      {
+        total_reviews: reviews.count,
+        completed_reviews: reviews.where(status: 'completed').count,
+        average_score: reviews.joins(:ratings).average('ratings.score')&.round(2) || 0,
+        performance_trends: calculate_performance_trends(reviews),
+        competency_analysis: calculate_competency_analysis(reviews),
+        goal_achievement_history: calculate_goal_achievement_history(reviews),
+        review_history: reviews.order(:created_at).limit(10).map do |review|
+          {
+            id: review.id,
+            title: review.title,
+            status: review.status,
+            created_at: review.created_at
+          }
+        end
+      }
+    end
     
     if include_benchmarks
-      analytics_data[:department_benchmarks] = {
-        department_average: 3.5,
-        position_average: 3.7
-      }
+      analytics_data[:department_comparison] = calculate_department_comparison(employee_id)
+      analytics_data[:position_benchmarks] = calculate_position_benchmarks(employee_id)
     end
     
     render json: { data: analytics_data }
@@ -197,7 +228,7 @@ class Api::V1::PerformanceReviewsController < ApplicationController
   def set_performance_review
     @performance_review = PerformanceReview.find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    render json: { errors: ['Performance review not found'] }, status: :not_found
+    render json: { error: 'Performance review not found' }, status: :not_found
   end
 
   def authorize_review_access
@@ -207,6 +238,7 @@ class Api::V1::PerformanceReviewsController < ApplicationController
     unless employee == @performance_review.employee || 
            employee == @performance_review.reviewer || 
            employee == @performance_review.employee.manager ||
+           employee.can_review?(@performance_review.employee) ||
            current_user.admin? || 
            current_user.super_admin?
       render json: { errors: ['Unauthorized access'] }, status: :forbidden
@@ -279,6 +311,8 @@ class Api::V1::PerformanceReviewsController < ApplicationController
       goals_count: review.goals.count,
       feedbacks_count: review.feedbacks.count,
       ratings_count: review.ratings.count,
+      goals: review.goals.map { |goal| { id: goal.id, title: goal.title, status: goal.status } },
+      ratings: review.ratings.map { |rating| { id: rating.id, score: rating.score, competency_name: rating.competency_name } },
       feedback_summary: review.feedback_summary,
       created_at: review.created_at,
       updated_at: review.updated_at
@@ -313,10 +347,12 @@ class Api::V1::PerformanceReviewsController < ApplicationController
       status: review.status,
       overall_score: review.ratings.average(:score)&.round(2) || 0,
       completion_percentage: review.completion_percentage,
-      feedback_summary: Feedback.feedback_summary_for_employee(review.employee_id, review.start_date, review.end_date),
+      goals_completion_rate: calculate_goals_completion_rate(review),
+      feedback_summary: review.feedback_summary,
+      competency_scores: calculate_competency_scores(review),
       goals_summary: {
         total: review.goals.count,
-        completed: review.goals.completed_goals.count,
+        completed: review.goals.where(status: :completed).count,
         average_progress: review.goals.average(:actual_value)&.round(2) || 0
       },
       ratings_summary: {
@@ -325,5 +361,93 @@ class Api::V1::PerformanceReviewsController < ApplicationController
         by_competency: review.ratings.group(:competency_name).average(:score)
       }
     }
+  end
+
+  def format_validation_errors(errors)
+    formatted = {}
+    if errors.respond_to?(:each)
+      errors.each do |error|
+        field = error.attribute.to_s
+        formatted[field] ||= []
+        formatted[field] << error.message
+      end
+    else
+      # Handle case where errors is mocked or different structure
+      formatted = { 'general' => [errors.to_s] }
+    end
+    formatted
+  end
+
+  def calculate_performance_trends(reviews)
+    completed_reviews = reviews.where(status: :completed).order(:completed_at)
+    return [] if completed_reviews.empty?
+
+    completed_reviews.map do |review|
+      {
+        date: review.completed_at,
+        overall_score: review.overall_score,
+        goals_completion: review.completion_percentage
+      }
+    end
+  end
+
+  def calculate_competency_analysis(reviews)
+    ratings = Rating.joins(:performance_review).where(performance_reviews: { id: reviews.pluck(:id) })
+    return {} if ratings.empty?
+
+    ratings.group(:competency_name).average(:score).transform_values { |score| score.round(2) }
+  end
+
+  def calculate_goal_achievement_history(reviews)
+    reviews.includes(:goals).map do |review|
+      {
+        review_id: review.id,
+        review_title: review.title,
+        goals_total: review.goals.count,
+        goals_completed: review.goals.where(status: :completed).count,
+        completion_rate: review.completion_percentage
+      }
+    end
+  end
+
+  def calculate_department_comparison(employee_id)
+    employee = Employee.includes(:department).find(employee_id)
+    return {} unless employee.department
+    
+    department_avg = PerformanceReview.joins(employee: :department)
+                                     .where(employees: { departments: { id: employee.department.id } })
+                                     .joins(:ratings)
+                                     .average('ratings.score')&.round(2) || 0
+    
+    {
+      department_average: department_avg,
+      employee_average: PerformanceReview.where(employee_id: employee_id)
+                                        .joins(:ratings)
+                                        .average('ratings.score')&.round(2) || 0
+    }
+  end
+
+  def calculate_position_benchmarks(employee_id)
+    employee = Employee.find(employee_id)
+    position_avg = PerformanceReview.joins(:employee)
+                                   .where(employees: { position_id: employee.position_id })
+                                   .joins(:ratings)
+                                   .average('ratings.score')&.round(2) || 0
+    
+    {
+      position_average: position_avg,
+      industry_benchmark: 3.5 # This could come from external data
+    }
+  end
+
+  def calculate_goals_completion_rate(review)
+    return 0 if review.goals.empty?
+    completed = review.goals.where(status: :completed).count
+    (completed.to_f / review.goals.count * 100).round(2)
+  end
+
+  def calculate_competency_scores(review)
+    return {} if review.ratings.empty?
+    review.ratings.group(:competency_name).average(:score).transform_values { |score| score.round(2) }
   end
 end 

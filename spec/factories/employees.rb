@@ -35,6 +35,11 @@ FactoryBot.define do
     end
 
     trait :manager do
+      after(:build) do |employee|
+        # Ensure manager has a position with level > 1 so subordinates can have level >= 1
+        employee.position = create(:position, department: employee.position.department, level: 3)
+      end
+      
       after(:create) do |employee|
         # Create subordinate positions with lower level
         subordinate_position = create(:position, 

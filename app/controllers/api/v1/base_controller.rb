@@ -5,7 +5,7 @@ module Api
       include UserActivity
 
       before_action :authenticate_user!
-      after_action :verify_authorized, except: :index
+      after_action :verify_authorized, except: [:index, :bulk_create, :bulk_update, :bulk_delete]
       after_action :verify_policy_scoped, only: :index
 
       rescue_from ActiveRecord::RecordNotFound, with: :not_found

@@ -42,6 +42,8 @@ Rails.application.routes.draw do
         collection do
           get :tree
           post :bulk_create
+          patch :bulk_update
+          delete :bulk_delete
         end
         
         resources :positions, only: [:index], controller: 'positions', action: 'by_department'
@@ -55,6 +57,8 @@ Rails.application.routes.draw do
         collection do
           get :tree
           post :bulk_create
+          patch :bulk_update
+          delete :bulk_delete
         end
         
         resources :employees, only: [:index], controller: 'employees', action: 'by_position'
@@ -68,6 +72,8 @@ Rails.application.routes.draw do
         collection do
           get :search
           post :bulk_create
+          patch :bulk_update
+          delete :bulk_delete
         end
       end
 

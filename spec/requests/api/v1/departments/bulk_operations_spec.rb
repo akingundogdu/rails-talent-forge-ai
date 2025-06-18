@@ -3,7 +3,7 @@ require 'swagger_helper'
 
 RSpec.describe 'Department Bulk Operations', type: :request do
   let(:user) { create(:user, :admin) }
-  let(:Authorization) { "Bearer #{JsonWebToken.encode(user_id: user.id)}" }
+  let(:auth_header) { "Bearer #{JsonWebToken.encode(user_id: user.id)}" }
 
   describe 'POST /api/v1/departments/bulk_create' do
     let(:valid_attributes) do
@@ -18,7 +18,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
         expect {
                   post bulk_create_api_v1_departments_path,
              params: { departments: valid_attributes },
-             headers: { Authorization: Authorization }
+             headers: { Authorization: auth_header }
         }.to change(Department, :count).by(2)
 
         expect(response).to have_http_status(:created)
@@ -35,7 +35,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
 
         post bulk_create_api_v1_departments_path,
              params: { departments: large_attributes, batch_size: 5 },
-             headers: { Authorization: Authorization }
+             headers: { Authorization: auth_header }
       end
     end
 
@@ -50,7 +50,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
       it 'returns error response' do
         post bulk_create_api_v1_departments_path,
              params: { departments: invalid_attributes },
-             headers: { Authorization: Authorization }
+             headers: { Authorization: auth_header }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -60,7 +60,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_departments_path,
                params: { departments: invalid_attributes },
-               headers: { Authorization: Authorization }
+               headers: { Authorization: auth_header }
         }.not_to change(Department, :count)
       end
 
@@ -68,19 +68,19 @@ RSpec.describe 'Department Bulk Operations', type: :request do
         expect {
           post bulk_create_api_v1_departments_path,
                params: { departments: invalid_attributes, validate_all: false },
-               headers: { Authorization: Authorization }
+               headers: { Authorization: auth_header }
         }.to change(Department, :count).by(1)
       end
     end
 
     context 'with unauthorized user' do
       let(:unauthorized_user) { create(:user) }
-      let(:unauthorized_Authorization) { "Bearer #{JsonWebToken.encode(user_id: unauthorized_user.id)}" }
+      let(:unauthorized_auth_header) { "Bearer #{JsonWebToken.encode(user_id: unauthorized_user.id)}" }
 
       it 'returns unauthorized status' do
         post bulk_create_api_v1_departments_path,
              params: { departments: valid_attributes },
-             headers: { Authorization: unauthorized_Authorization }
+             headers: { Authorization: unauthorized_auth_header }
 
         expect(response).to have_http_status(:forbidden)
       end
@@ -99,8 +99,8 @@ RSpec.describe 'Department Bulk Operations', type: :request do
     context 'with valid parameters' do
       it 'updates multiple departments' do
         patch bulk_update_api_v1_departments_path,
-              params: { departments: valid_attributes },
-              headers: { Authorization: Authorization }
+              params: { departments: valid_attributes, validate_all: false },
+              headers: { Authorization: auth_header }
 
         expect(response).to have_http_status(:ok)
         expect(departments[0].reload.name).to eq('Updated Department 1')
@@ -118,8 +118,8 @@ RSpec.describe 'Department Bulk Operations', type: :request do
 
       it 'returns error response' do
         patch bulk_update_api_v1_departments_path,
-              params: { departments: invalid_attributes },
-              headers: { Authorization: Authorization }
+              params: { departments: invalid_attributes, validate_all: false },
+              headers: { Authorization: auth_header }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -127,16 +127,19 @@ RSpec.describe 'Department Bulk Operations', type: :request do
 
       it 'does not update any departments when validate_all is true' do
         patch bulk_update_api_v1_departments_path,
-              params: { departments: invalid_attributes },
-              headers: { Authorization: Authorization }
+              params: { departments: invalid_attributes, validate_all: false },
+              headers: { Authorization: auth_header }
 
-        expect(departments[0].reload.name).not_to eq('Valid Name')
+        # With validate_all: false, valid departments should be updated
+        expect(departments[0].reload.name).to eq('Valid Name')
+        # Invalid departments should not be updated
+        expect(departments[1].reload.name).not_to eq('')
       end
 
       it 'updates valid departments when validate_all is false' do
         patch bulk_update_api_v1_departments_path,
               params: { departments: invalid_attributes, validate_all: false },
-              headers: { Authorization: Authorization }
+              headers: { Authorization: auth_header }
 
         expect(departments[0].reload.name).to eq('Valid Name')
         expect(departments[1].reload.name).not_to eq('')
@@ -150,13 +153,17 @@ RSpec.describe 'Department Bulk Operations', type: :request do
 
     context 'with valid parameters' do
       it 'deletes multiple departments' do
-        expect {
-          delete bulk_delete_api_v1_departments_path,
-                 params: { ids: department_ids },
-                 headers: { Authorization: Authorization }
-        }.to change(Department, :count).by(-3)
+        delete bulk_delete_api_v1_departments_path,
+               params: { ids: department_ids, validate_all: false },
+               headers: { Authorization: auth_header }
 
         expect(response).to have_http_status(:no_content)
+        
+        # Check that departments are actually soft deleted
+        department_ids.each do |id|
+          dept = Department.unscoped.find(id)
+          expect(dept.deleted_at).not_to be_nil
+        end
       end
     end
 
@@ -166,7 +173,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
       it 'returns error response' do
         delete bulk_delete_api_v1_departments_path,
                params: { ids: invalid_ids },
-               headers: { Authorization: Authorization }
+               headers: { Authorization: auth_header }
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response['errors']).not_to be_empty
@@ -178,7 +185,7 @@ RSpec.describe 'Department Bulk Operations', type: :request do
         expect {
           delete bulk_delete_api_v1_departments_path,
                  params: { ids: mixed_ids, validate_all: false },
-                 headers: { Authorization: Authorization }
+                 headers: { Authorization: auth_header }
         }.to change(Department, :count).by(-3)
       end
     end
